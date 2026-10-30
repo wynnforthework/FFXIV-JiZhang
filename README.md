@@ -88,3 +88,5 @@ python scripts/render-preview.py
 - `scripts`：锁定参考程序集、构建和依赖白名单打包。
 
 MIT License · [GitHub](https://github.com/wynnforthework/FFXIV-JiZhang)
+
+趋势使用折线：仅有一种收支时隐藏空系列；双方日峰值相差至少 8 倍时，自动使用上下独立刻度并明确标注，悬浮提示保留准确金额。支出分类使用圆环及金额／占比图例，超过三类时将其余合并为“其他”。

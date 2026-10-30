@@ -15,9 +15,9 @@ unsafe {
         File.WriteAllBytes(Path.Combine(root,$"atlas-{t}.rgba"),new ReadOnlySpan<byte>(pixels,w*h*4).ToArray());
         File.WriteAllText(Path.Combine(root,$"atlas-{t}.json"),JsonSerializer.Serialize(new{width=w,height=h}));
     }
-    foreach(var scenario in new[]{("empty",false,0,1040,780,1f),("populated",true,0,1040,780,1f),("transactions",true,1,1040,780,1f),("empty-transactions",false,1,1040,780,1f),("settings",false,2,1040,820,1f),("narrow",true,0,760,780,1f),("scaled",true,0,1040,780,1.6f)}) {
+    foreach(var scenario in new[]{("empty",false,0,1040,780,1f),("populated",true,0,1040,780,1f),("expense-only",true,0,1040,780,1f),("income-only",true,0,1040,780,1f),("huge-income",true,0,1040,780,1f),("huge-expense",true,0,1040,780,1f),("transactions",true,1,1040,780,1f),("empty-transactions",false,1,1040,780,1f),("settings",false,2,1040,820,1f),("narrow",true,0,760,780,1f),("scaled",true,0,1040,780,1.6f)}) {
         var (name,data,tab,width,height,scale)=scenario;
-        var model=new PreviewContext(data);model.Config.Scale=scale;var view=new LedgerView(model);view.SelectTab(tab);
+        var model=new PreviewContext(data,name);model.Config.Scale=scale;var view=new LedgerView(model);view.SelectTab(tab);
         io.DisplaySize=new(width,height);var open=true;
         for(var frame=0;frame<3;frame++) {
             io.MousePos=new(470,480);ImGui.NewFrame();LedgerTheme.Push();
@@ -44,11 +44,17 @@ namespace JiZhang {
         public Configuration Config{get;}=new();public LedgerEntry[] Entries{get;}
         public BalanceSample? Current{get;}=new(1,"示例角色",DateTimeOffset.Now,1518170,new(128,"利姆萨·罗敏萨"));
         public string Status=>"正在自动记录 · 离线示例";public string DataDirectory=>"本地账本目录";
-        public PreviewContext(bool data) {
+        public PreviewContext(bool data,string scenario) {
             if(!data){Entries=[];return;}
             var list=new List<LedgerEntry>();long balance=1518170;
             for(var i=0;i<14;i++) {
-                var amount=i%3==0?12800+i*110:-580-i*80;
+                long amount=scenario switch {
+                    "expense-only"=>-580-i*80,
+                    "income-only"=>12800+i*110,
+                    "huge-income"=>i%3==0?12000000+i*110:-580-i*80,
+                    "huge-expense"=>i%3==0?580+i*80:-12000000-i*110,
+                    _=>i%3==0?2800+i*110:-1580-i*80
+                };
                 list.Add(new(i.ToString(),1,"示例角色",DateTimeOffset.Now.AddDays(-i),balance-amount,balance,new(128,"利姆萨·罗敏萨"),amount>0?Category.QuestReward:i%2==0?Category.MarketPurchase:Category.Teleport));
             }Entries=list.ToArray();
         }

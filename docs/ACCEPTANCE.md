@@ -37,3 +37,5 @@
 本轮 Windows Computer Use 连接失败：`Computer Use native pipe is unavailable`（系统找不到指定的文件，os error 2）；按技能流程重试与重置后仍失败。因此未执行真实游戏交易或宣称游戏内通过。
 
 完成后将实际步骤、版本、日期和结果写入此文件，并设置 `release-validation.json` 的 `passed=true`、`validatedAt` 和 `evidence`。不要用自动测试结果代替国服游戏内验收。
+
+- [ ] 核对仅收入、仅支出、收支相近、峰值差距至少 8 倍四种趋势；确认独立刻度标注、日期和准确悬浮金额。核对圆环分类合计与本月支出一致。

@@ -106,7 +106,7 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         if(inlineMetrics)ImGui.SameLine(0,gap);Metric("net","本月结余",monthTotal.Net.ToString("+#,0;-#,0;0"),"收入减去支出",Ink,width);
         var wide=ImGui.GetContentRegionAvail().X>680*Unit;
         var chartWidth=wide?(ImGui.GetContentRegionAvail().X-gap)*.61f:ImGui.GetContentRegionAvail().X;
-        var chartHeight=(trend.All(t=>t.Income==0&&t.Expense==0)?205:245)*Unit;
+        var chartHeight=(trend.All(t=>t.Income==0&&t.Expense==0)?205:285)*Unit;
         if(Panel("trend-panel",new(chartWidth,chartHeight))) {
             ImGui.TextUnformatted("收支趋势");ImGui.SameLine();ImGui.TextColored(Muted,"最近 14 天");
             if(trend.All(t=>t.Income==0&&t.Expense==0)) Empty("等待第一笔金币流动","有收入或支出后，这里会自动展示每日趋势。",125);
@@ -116,15 +116,7 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         if(Panel("categories",new(wide?ImGui.GetContentRegionAvail().X:-1,chartHeight))) {
             ImGui.TextUnformatted("支出去向");ImGui.SameLine();ImGui.TextColored(Muted,"本月");
             if(groups.Length==0)Empty("本月还没有支出","每一笔开销，都会在这里找到去向。",125);
-            else {
-                var count=Math.Min(groups.Length,4);
-                for(var i=0;i<count;i++) {
-                    var g=groups[i];ImGui.Spacing();ImGui.TextUnformatted(g.Category.Label());ImGui.SameLine();ImGui.TextColored(Muted,Money(g.Amount));
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram,i==0?Green:new Vector4(.64f,.73f,.65f,1));
-                    ImGui.ProgressBar((float)g.Amount/Math.Max(1,monthTotal.Expense),new(-1,6*Unit),"");ImGui.PopStyleColor();
-                }
-                if(groups.Length>4&&ImGui.SmallButton("查看全部流水"))tab=1;
-            }
+            else DrawCategories();
         }EndPanel();
         if(Panel("recent",new(-1,plugin.Entries.Length==0?115*Unit:190*Unit))) {
             ImGui.TextUnformatted("最近流水");ImGui.SameLine();if(ImGui.SmallButton("查看全部"))tab=1;
@@ -153,32 +145,74 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         ImGui.PushTextWrapPos(ImGui.GetCursorPosX()+width);ImGui.TextColored(Muted,description);ImGui.PopTextWrapPos();
         ImGui.Dummy(new(1,Math.Max(0,height-112)*Unit));
     }
-    private void DrawTrend() {
-        ImGui.TextColored(Green,"收入");ImGui.SameLine();ImGui.TextColored(Red,"支出");
-        var pos=ImGui.GetCursorScreenPos();var size=new Vector2(ImGui.GetContentRegionAvail().X,150*Unit);
-        var draw=ImGui.GetWindowDrawList();var max=Math.Max(1,trend.Max(t=>Math.Max(t.Income,t.Expense)));
-        var step=size.X/14;var baseline=pos.Y+size.Y-25*Unit;var height=size.Y-42*Unit;
-        for(var row=0;row<3;row++) {
-            var y=baseline-height*row/2;
-            draw.AddLine(new(pos.X,y),new(pos.X+size.X,y),Color(new(.90f,.92f,.90f,1)));
+    private void DrawCategories() {
+        // Keep the largest three categories and aggregate the remainder, so the whole ring is accounted for.
+        var slices=groups.Take(3).Select(g=>(Label:g.Category.Label(),g.Amount)).ToList();
+        if(groups.Length>3)slices.Add(("其他",groups.Skip(3).Sum(g=>g.Amount)));
+        Vector4[] colors=[Green,Gold,new(.39f,.58f,.69f,1),new(.69f,.63f,.77f,1)];
+        var draw=ImGui.GetWindowDrawList();var origin=ImGui.GetCursorScreenPos();
+        var center=origin+new Vector2(ImGui.GetContentRegionAvail().X/2,49*Unit);
+        var outer=42*Unit;var inner=31*Unit;double angle=-Math.PI/2;
+        for(var i=0;i<slices.Count;i++) {
+            var sweep=2*Math.PI*slices[i].Amount/monthTotal.Expense;
+            draw.PathArcTo(center,(outer+inner)/2,(float)angle,(float)(angle+sweep),Math.Max(4,(int)Math.Ceiling(sweep*24)));
+            draw.PathStroke(Color(colors[i]),ImDrawFlags.None,outer-inner);
+            angle+=sweep;
         }
-        for(var i=0;i<14;i++) {
-            var x=pos.X+i*step+step*.17f;var bar=step*.25f;
-            if(trend[i].Income>0)draw.AddRectFilled(new(x,baseline-height*trend[i].Income/max),new(x+bar,baseline),Color(Green),2);
-            if(trend[i].Expense>0)draw.AddRectFilled(new(x+bar+2,baseline-height*trend[i].Expense/max),new(x+2*bar+2,baseline),Color(Red),2);
-            if(i%4==0)draw.AddText(new(x,baseline+7*Unit),Color(Muted),day.AddDays(i-13).ToString("MM/dd"));
+        var label="支出占比";draw.AddText(center-ImGui.CalcTextSize(label)/2,Color(Muted),label);
+        ImGui.Dummy(new(1,100*Unit));
+        for(var i=0;i<slices.Count;i++) {
+            var item=slices[i];var pos=ImGui.GetCursorScreenPos();draw.AddCircleFilled(pos+new Vector2(4,8)*Unit,3*Unit,Color(colors[i]));
+            ImGui.Indent(14*Unit);ImGui.TextUnformatted(item.Label);ImGui.SameLine();
+            ImGui.TextColored(Muted,$"{(double)item.Amount/monthTotal.Expense:P0} · {Money(item.Amount)}");ImGui.Unindent(14*Unit);
+        }
+        if(groups.Length>3&&ImGui.SmallButton("查看分类流水"))tab=1;
+    }
+    private void DrawTrend() {
+        var income=trend.Max(t=>t.Income);var expense=trend.Max(t=>t.Expense);
+        var split=income>0&&expense>0&&(double)Math.Max(income,expense)/Math.Min(income,expense)>=8;
+        if(income>0){ImGui.TextColored(Green,"收入");if(expense>0)ImGui.SameLine();}
+        if(expense>0)ImGui.TextColored(Red,"支出");
+        ImGui.TextColored(Muted,split?"量级差异较大 · 上下图独立刻度（GIL）":income==0?"仅支出 · 金额（GIL）":expense==0?"仅收入 · 金额（GIL）":"同一刻度 · 金额（GIL）");
+        var origin=ImGui.GetCursorScreenPos();var size=new Vector2(ImGui.GetContentRegionAvail().X,185*Unit);
+        var draw=ImGui.GetWindowDrawList();var left=70*Unit;var plotWidth=Math.Max(1,size.X-left-12*Unit);
+        var step=plotWidth/13;
+        void Lane(float top,float height,long max,bool showIncome,bool showExpense) {
+            var baseline=origin.Y+top+height;var peak=origin.Y+top+8*Unit;
+            for(var row=0;row<3;row++) {
+                var y=baseline-(baseline-peak)*row/2;
+                draw.AddLine(new(origin.X+left,y),new(origin.X+size.X,y),Color(new(.90f,.92f,.90f,1)));
+                var value=AxisAmount(max*row/2d);draw.AddText(new(origin.X,y-7*Unit),Color(Muted),value);
+            }
+            void Series(bool positive,Vector4 color) {
+                Vector2? previous=null;
+                for(var i=0;i<14;i++) {
+                    var amount=positive?trend[i].Income:trend[i].Expense;
+                    var point=new Vector2(origin.X+left+i*step,baseline-(baseline-peak)*(float)((double)amount/max));
+                    if(previous.HasValue)draw.AddLine(previous.Value,point,Color(color),2*Unit);
+                    if(amount>0)draw.AddCircleFilled(point,3*Unit,Color(color),12);
+                    previous=point;
+                }
+            }
+            if(showIncome)Series(true,Green);if(showExpense)Series(false,Red);
+        }
+        if(split){Lane(0,67*Unit,income,true,false);Lane(88*Unit,67*Unit,expense,false,true);}
+        else Lane(0,155*Unit,Math.Max(income,expense),income>0,expense>0);
+        foreach(var i in new[]{0,4,8,13}) {
+            var label=day.AddDays(i-13).ToString("MM/dd");
+            draw.AddText(new(origin.X+left+i*step-ImGui.CalcTextSize(label).X/2,origin.Y+164*Unit),Color(Muted),label);
         }
         ImGui.InvisibleButton("trend-hit",size);
-        if(ImGui.IsItemHovered()) {
-            var i=Math.Clamp((int)((ImGui.GetMousePos().X-pos.X)/step),0,13);
+        if(ImGui.IsItemHovered()&&ImGui.GetMousePos().X>=origin.X+left) {
+            var i=Math.Clamp((int)Math.Round((ImGui.GetMousePos().X-origin.X-left)/step),0,13);
             if(trend[i].Income!=0||trend[i].Expense!=0) {
-                // Tooltips have their own explicit palette; never inherit unreadable game colors.
                 ImGui.PushStyleColor(ImGuiCol.PopupBg,new Vector4(.10f,.16f,.13f,1));ImGui.PushStyleColor(ImGuiCol.Text,Vector4.One);
                 try {ImGui.BeginTooltip();ImGui.TextUnformatted(day.AddDays(i-13).ToString("yyyy-MM-dd"));ImGui.TextUnformatted($"收入  {Money(trend[i].Income)} GIL");ImGui.TextUnformatted($"支出  {Money(trend[i].Expense)} GIL");ImGui.EndTooltip();}
                 finally {ImGui.PopStyleColor(2);}
             }
         }
     }
+    private static string AxisAmount(double value) => value>=100000000?(value/100000000).ToString("0.#")+"亿":value>=10000?(value/10000).ToString("0.#")+"万":value.ToString("0.#");
     private void Transactions() {
         if(Panel("filters",new(-1,175*Unit))) {
             if(ImGui.BeginTable("filter-layout",2,ImGuiTableFlags.SizingStretchSame)) {
