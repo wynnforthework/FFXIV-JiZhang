@@ -21,14 +21,14 @@ unsafe {
         File.WriteAllBytes(Path.Combine(root,$"atlas-{t}.rgba"),new ReadOnlySpan<byte>(pixels,w*h*4).ToArray());
         File.WriteAllText(Path.Combine(root,$"atlas-{t}.json"),JsonSerializer.Serialize(new{width=w,height=h}));
     }
-    foreach(var scenario in new[]{("empty",false,0,1040,780,1f),("populated",true,0,1040,780,1f),("expense-only",true,0,1040,780,1f),("income-only",true,0,1040,780,1f),("huge-income",true,0,1040,780,1f),("huge-expense",true,0,1040,780,1f),("transactions",true,1,1040,780,1f),("empty-transactions",false,1,1040,780,1f),("settings",false,2,1040,820,1f),("narrow",true,0,760,780,1f),("scaled",true,0,1040,780,1.6f)}) {
+    foreach(var scenario in new[]{("empty",false,0,1040,780,1f),("populated",true,0,1040,780,1f),("reference-size",true,0,936,768,1f),("expense-only",true,0,1040,780,1f),("income-only",true,0,1040,780,1f),("huge-income",true,0,1040,780,1f),("huge-expense",true,0,1040,780,1f),("transactions",true,1,1040,780,1f),("empty-transactions",false,1,1040,780,1f),("settings",false,2,1040,820,1f),("narrow",true,0,760,780,1f),("scaled",true,0,1040,780,1.6f)}) {
         var (name,data,tab,width,height,scale)=scenario;
         var model=new PreviewContext(data,name);model.Config.Scale=scale;var view=new LedgerView(model);view.SelectTab(tab);
         io.DisplaySize=new(width,height);var open=true;
         for(var frame=0;frame<3;frame++) {
             io.MousePos=new(470,480);ImGui.NewFrame();LedgerTheme.Push();
             ImGui.SetNextWindowPos(Vector2.Zero,ImGuiCond.Always);ImGui.SetNextWindowSize(new(width,height),ImGuiCond.Always);
-            if(ImGui.Begin("金币账本###JiZhang",ref open,ImGuiWindowFlags.NoCollapse))view.Draw();
+            if(ImGui.Begin("金币账本###JiZhang",ref open,ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse))view.Draw();
             ImGui.End();LedgerTheme.Pop();ImGui.Render();
         }
         var dd=ImGui.GetDrawData();

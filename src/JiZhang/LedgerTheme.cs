@@ -30,7 +30,7 @@ internal static class LedgerTheme
     ];
     public static void Push() {
         foreach(var (key,value) in Colors) ImGui.PushStyleColor(key,value);
-        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,new Vector2(18,14));
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,Vector2.Zero);
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing,new Vector2(10,9));
         ImGui.PushStyleVar(ImGuiStyleVar.FramePadding,new Vector2(10,7));
         ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding,7f);
