@@ -1,0 +1,63 @@
+name: Publish validated release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Require tagged commit on main and completed acceptance
+        shell: pwsh
+        run: |
+          git checkout --detach $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Could not check out release commit' }
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE -ne 0) { throw 'Release commit must belong to main' }
+          $acceptance = Get-Content release-validation.json | ConvertFrom-Json
+          $manifest = Get-Content src/JiZhang/JiZhang.json | ConvertFrom-Json
+          if (!$acceptance.passed -or $acceptance.version -ne $manifest.AssemblyVersion -or !$acceptance.validatedAt -or !$acceptance.evidence) { throw 'Complete and record CN in-game acceptance before publishing.' }
+          if ($env:GITHUB_REF_NAME -ne "v$($manifest.AssemblyVersion)") { throw 'Tag and manifest versions differ.' }
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download pinned API 15 reference assemblies
+        shell: pwsh
+        run: ./scripts/Get-Dalamud.ps1
+      - name: Build, test and package
+        shell: pwsh
+        run: ./scripts/Build.ps1
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create $env:GITHUB_REF_NAME artifacts/JiZhang.zip artifacts/SHA256SUMS --title "金币账本 $env:GITHUB_REF_NAME" --generate-notes
+          if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }
+      - name: Update plugin subscription
+        shell: pwsh
+        run: |
+          $repo = Get-Content artifacts/repo.json -Raw | ConvertFrom-Json
+          $repo[0].LastUpdate = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+          $json = ConvertTo-Json -InputObject @($repo) -Depth 10
+          git checkout main
+          if ($LASTEXITCODE -ne 0) { throw 'Could not check out main' }
+          git pull --ff-only origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Main changed, refusing to overwrite subscription' }
+          [IO.File]::WriteAllText((Join-Path $PWD 'repo.json'), $json, [Text.UTF8Encoding]::new($false))
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add repo.json
+          git commit -m "chore: publish $env:GITHUB_REF_NAME subscription"
+          if ($LASTEXITCODE -eq 0) { git push origin main; if ($LASTEXITCODE -ne 0) { throw 'Subscription push failed' } }

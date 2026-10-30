@@ -1,0 +1,18 @@
+{
+  "Author": "wynnforthework",
+  "Name": "金币账本",
+  "InternalName": "JiZhang",
+  "AssemblyVersion": "0.1.0.0",
+  "Description": "浅色界面的本地自动金币账本。自动记录金币变化，来源无法确认时保留未分类。",
+  "Punchline": "金币流向，一目了然",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 15,
+  "RepoUrl": "https://github.com/wynnforthework/FFXIV-JiZhang",
+  "Tags": [
+    "gil",
+    "ledger",
+    "金币",
+    "记账"
+  ],
+  "LoadRequiredState": 0
+}
