@@ -28,7 +28,7 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
     private static string Money(long v) => v.ToString("N0",CultureInfo.CurrentCulture);
     private static uint Color(Vector4 c) => ImGui.ColorConvertFloat4ToU32(c);
     public void Draw() {
-        ImGui.SetWindowFontScale(Math.Clamp(plugin.Config.Scale,.8f,1.6f));
+        using var bodyFont=plugin.PushFont(1f);
         if(tabForPreview>=0){tab=tabForPreview;tabForPreview=-1;}
         Refresh();
         var sidebar=142*Unit;
@@ -60,12 +60,14 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         ImGui.Dummy(new(1,25*Unit));
         for(var i=0;i<3;i++) {
             var active=tab==i;
-            ImGui.PushStyleColor(ImGuiCol.Button,active?new Vector4(.13f,.29f,.23f,1):Canvas);
-            ImGui.PushStyleColor(ImGuiCol.Text,active?Vector4.One:Muted);
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered,active?new Vector4(.18f,.36f,.28f,1):new Vector4(.88f,.92f,.89f,1));
-            ImGui.PushStyleColor(ImGuiCol.ButtonActive,new Vector4(.23f,.42f,.31f,1));
+            ImGui.PushStyleColor(ImGuiCol.Button,active?new Vector4(.24f,.19f,.36f,1):Canvas);
+            ImGui.PushStyleColor(ImGuiCol.Text,active?Ink:Muted);
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered,active?new Vector4(.29f,.23f,.43f,1):Surface);
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive,Accent);
+            var navOrigin=ImGui.GetCursorScreenPos();
             try {if(ImGui.Button(new[]{"资产概览","收支流水","偏好与数据"}[i],new(-1,43*Unit)))tab=i;}
             finally{ImGui.PopStyleColor(4);}
+            if(active)ImGui.GetWindowDrawList().AddRectFilled(navOrigin+new Vector2(0,10)*Unit,navOrigin+new Vector2(3,33)*Unit,Color(Accent),2*Unit);
         }
         ImGui.Dummy(new(1,22*Unit));ImGui.Separator();ImGui.Spacing();
         ImGui.TextColored(Muted,"当前角色");ImGui.TextWrapped(plugin.Current?.CharacterName??"等待登录");
@@ -78,26 +80,33 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         TextLarge(title,1.42f,Ink);ImGui.TextColored(Muted,subtitle);ImGui.Dummy(new(1,10*Unit));
     }
     private void TextLarge(string text,float factor,Vector4 color) {
-        var fit=Math.Max(.85f,Math.Min(factor,ImGui.GetContentRegionAvail().X/Math.Max(1,ImGui.CalcTextSize(text).X)));
-        var pos=ImGui.GetCursorScreenPos();
-        ImGui.GetWindowDrawList().AddText(ImGui.GetFont(),ImGui.GetFontSize()*fit,pos,Color(color),text);
-        ImGui.Dummy(new Vector2(Math.Min(ImGui.GetContentRegionAvail().X,ImGui.CalcTextSize(text).X*fit),ImGui.GetFontSize()*fit+3*Unit));
+        using var font=plugin.PushFont(factor>=1.8f?2f:factor>=1.2f?1.3f:1f);
+        ImGui.PushStyleColor(ImGuiCol.Text,color);
+        ImGui.TextUnformatted(text);
+        ImGui.PopStyleColor();
     }
     private bool Panel(string id,Vector2 size,Vector4? bg=null) {
-        ImGui.PushStyleColor(ImGuiCol.ChildBg,bg??Vector4.One);
+        ImGui.PushStyleColor(ImGuiCol.ChildBg,bg??Surface);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,new Vector2(18,16)*Unit);
         var visible=ImGui.BeginChild(id,size,true,ImGuiWindowFlags.AlwaysUseWindowPadding|ImGuiWindowFlags.NoScrollbar);
-        ImGui.SetWindowFontScale(Math.Clamp(plugin.Config.Scale,.8f,1.6f));
+        if(visible) {
+            var draw=ImGui.GetWindowDrawList();var pos=ImGui.GetWindowPos();var end=pos+ImGui.GetWindowSize();
+            var start=draw.VtxBuffer.Size;
+            draw.AddRectFilled(pos,end,Color(Vector4.One),10*Unit);
+            var baseColor=bg??Surface;
+            ImGuiP.ShadeVertsLinearColorGradientKeepAlpha(draw,start,draw.VtxBuffer.Size,pos,new Vector2(pos.X,end.Y),Color(Vector4.Lerp(baseColor,Accent,.045f)),Color(baseColor));
+            draw.AddLine(pos+new Vector2(12,1)*Unit,new Vector2(end.X-12*Unit,pos.Y+Unit),Color(new(1,1,1,.055f)),Unit);
+        }
         return visible;
     }
     private static void EndPanel(){ImGui.EndChild();ImGui.PopStyleVar();ImGui.PopStyleColor();}
     private void Overview() {
-        if(Panel("wallet",new(-1,140*Unit),new(.13f,.25f,.21f,1))) {
-            ImGui.TextColored(new Vector4(.75f,.84f,.78f,1),"当前随身金币");
+        if(Panel("wallet",new(-1,140*Unit),new(.13f,.12f,.21f,1))) {
+            ImGui.TextColored(Muted,"当前随身金币");
             ImGui.Dummy(new(1,4*Unit));
-            TextLarge(plugin.Current==null?"—":Money(plugin.Current.Balance),2.1f,new(.98f,.94f,.82f,1));
-            ImGui.SameLine();ImGui.TextColored(new Vector4(.75f,.84f,.78f,1),"GIL");
-            ImGui.PushTextWrapPos(0);ImGui.TextColored(new Vector4(.75f,.84f,.78f,1),plugin.Current==null?"登录角色后开始记录":"只记录随身金币，雇员销售款提取后入账");ImGui.PopTextWrapPos();
+            TextLarge(plugin.Current==null?"—":Money(plugin.Current.Balance),2.1f,Gold);
+            ImGui.SameLine();ImGui.TextColored(Muted,"GIL");
+            ImGui.PushTextWrapPos(0);ImGui.TextColored(Muted,plugin.Current==null?"登录角色后开始记录":"只记录随身金币，雇员销售款提取后入账");ImGui.PopTextWrapPos();
         }EndPanel();
         var gap=10*Unit;var inlineMetrics=ImGui.GetContentRegionAvail().X>=540*Unit;
         var width=inlineMetrics?(ImGui.GetContentRegionAvail().X-gap*2)/3:ImGui.GetContentRegionAvail().X;
@@ -136,10 +145,10 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
     private void Empty(string title,string description,float height) {
         var width=ImGui.GetContentRegionAvail().X;var p=ImGui.GetCursorScreenPos();
         var draw=ImGui.GetWindowDrawList();var center=p+new Vector2(width/2,33*Unit);
-        draw.AddCircleFilled(center,20*Unit,Color(new(.94f,.95f,.92f,1)),32);
-        draw.AddLine(center+new Vector2(-9,5)*Unit,center+new Vector2(-3,-4)*Unit,Color(new(.57f,.65f,.58f,1)),2*Unit);
-        draw.AddLine(center+new Vector2(-3,-4)*Unit,center+new Vector2(3,2)*Unit,Color(new(.57f,.65f,.58f,1)),2*Unit);
-        draw.AddLine(center+new Vector2(3,2)*Unit,center+new Vector2(10,-9)*Unit,Color(new(.57f,.65f,.58f,1)),2*Unit);
+        draw.AddCircleFilled(center,20*Unit,Color(Surface2),32);
+        draw.AddLine(center+new Vector2(-9,5)*Unit,center+new Vector2(-3,-4)*Unit,Color(Muted),2*Unit);
+        draw.AddLine(center+new Vector2(-3,-4)*Unit,center+new Vector2(3,2)*Unit,Color(Muted),2*Unit);
+        draw.AddLine(center+new Vector2(3,2)*Unit,center+new Vector2(10,-9)*Unit,Color(Muted),2*Unit);
         ImGui.Dummy(new(1,62*Unit));
         ImGui.SetCursorPosX(ImGui.GetCursorPosX()+Math.Max(0,(width-ImGui.CalcTextSize(title).X)/2));ImGui.TextColored(Ink,title);
         ImGui.PushTextWrapPos(ImGui.GetCursorPosX()+width);ImGui.TextColored(Muted,description);ImGui.PopTextWrapPos();
@@ -181,7 +190,7 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
             var baseline=origin.Y+top+height;var peak=origin.Y+top+8*Unit;
             for(var row=0;row<3;row++) {
                 var y=baseline-(baseline-peak)*row/2;
-                draw.AddLine(new(origin.X+left,y),new(origin.X+size.X,y),Color(new(.90f,.92f,.90f,1)));
+                draw.AddLine(new(origin.X+left,y),new(origin.X+size.X,y),Color(Border));
                 var value=AxisAmount(max*row/2d);draw.AddText(new(origin.X,y-7*Unit),Color(Muted),value);
             }
             void Series(bool positive,Vector4 color) {
@@ -267,8 +276,8 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         if(Panel("preferences",new(-1,210*Unit))) {
             ImGui.TextUnformatted("记账偏好");ImGui.Spacing();
             var transfers=plugin.Config.ExcludeTransfers;if(ImGui.Checkbox("统计时排除雇员与部队资金转移",ref transfers)){plugin.Config.ExcludeTransfers=transfers;plugin.SaveConfig();}
-            var experimental=plugin.Config.EnableExperimentalClassification;if(ImGui.Checkbox("启用实验性用途识别",ref experimental)){plugin.Config.EnableExperimentalClassification=experimental;plugin.SaveConfig();}
-            ImGui.PushTextWrapPos(0);ImGui.TextColored(Muted,"关闭用途识别时仍会记录全部金币变化；未经确认的用途保留为未分类。");ImGui.PopTextWrapPos();
+            var experimental=plugin.Config.EnableExperimentalClassification;if(ImGui.Checkbox("根据交互窗口辅助分类（实验性）",ref experimental)){plugin.Config.EnableExperimentalClassification=experimental;plugin.SaveConfig();}
+            ImGui.PushTextWrapPos(0);ImGui.TextColored(Muted,"市场确认与系统消息始终参与金额匹配；此开关仅控制商店、修理等窗口推断。缺少证据时保留未分类。");ImGui.PopTextWrapPos();
             var scale=plugin.Config.Scale;ImGui.SetNextItemWidth(210*Unit);if(ImGui.SliderFloat("界面缩放",ref scale,.8f,1.6f,"%.2f")){plugin.Config.Scale=scale;plugin.SaveConfig();}
         }EndPanel();
         if(Panel("data",new(-1,0))) {

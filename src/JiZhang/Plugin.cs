@@ -35,6 +35,7 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
     private readonly ConcurrentQueue<Evidence> incoming = new();
     private readonly List<Task> saves = [];
     private readonly LedgerWindow window;
+    private readonly LedgerFonts fonts;
     private readonly WindowSystem windows = new("JiZhang");
     private Task<LedgerEntry[]>? read;
     private ulong readCharacter;
@@ -53,6 +54,7 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
         Config = Interface.GetPluginConfig() as Configuration ?? new();
         Store = new(Path.Combine(Interface.GetPluginConfigDirectory(), "ledger.sqlite"));
         initial = Store.LoadStatesAsync();
+        fonts = new(Interface.UiBuilder, Config);
         window = new(this);
         windows.AddWindow(window);
         Commands.AddHandler("/jizhang", new CommandInfo((_, _) => window.IsOpen = !window.IsOpen) { HelpMessage = "打开金币账本" });
@@ -66,7 +68,7 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
     }
     private void Draw() => windows.Draw();
     private void Open() => window.IsOpen = true;
-    internal void SaveConfig() => Interface.SavePluginConfig(Config);
+    internal void SaveConfig() { Interface.SavePluginConfig(Config); fonts.Refresh(); }
     private void Save(IEnumerable<Commit> commits) {
         foreach (var commit in commits) { saves.Add(Store.SaveAsync(commit)); dirty = true; }
     }
@@ -99,7 +101,6 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
             if (activeCharacter != sample.CharacterId) { activeCharacter = sample.CharacterId; Entries = []; dirty = true; }
             Save(engine.Observe(sample)); Current = sample;
             while (incoming.TryDequeue(out var e)) {
-                if (!Config.EnableExperimentalClassification) continue;
                 if (e.ItemId.HasValue) {
                     var item = Data.GetExcelSheet<Item>().GetRowOrDefault(e.ItemId.Value % 1000000);
                     e = e with { ItemName = item?.Name.ToString() ?? $"物品 #{e.ItemId}" };
@@ -112,7 +113,7 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
             if (dirty && read == null && now >= nextRead && saves.Count == 0) {
                 dirty = false; readCharacter = activeCharacter; read = Store.LoadEntriesAsync(activeCharacter); nextRead = now.AddSeconds(1);
             }
-            Status = Config.EnableExperimentalClassification ? "正在自动记录 · 用途识别为实验功能" : "正在自动记录 · 用途识别待国服验收";
+            Status = Config.EnableExperimentalClassification ? "正在自动记录 · 用途识别为实验功能" : "正在自动记录 · 事件金额匹配分类";
         } catch (Exception e) {
             if (restoring) { restoring = false; restoreTask = null; restoreStates = null; Status = "恢复失败，原账本保留：" + e.Message; }
             else { fatalError = e.Message; Status = "记录已暂停，请重新加载插件：" + e.Message; }
@@ -166,6 +167,7 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
         lock (marketLock) request = null;
         restoreTask = Store.RestoreAsync(path);
     }
+    public IDisposable PushFont(float tier) => fonts.Push(tier);
     Configuration ILedgerUiContext.Config => Config;
     LedgerEntry[] ILedgerUiContext.Entries => Entries;
     BalanceSample? ILedgerUiContext.Current => Current;
@@ -182,6 +184,7 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
         Interface.UiBuilder.Draw -= Draw; Interface.UiBuilder.OpenMainUi -= Open; Interface.UiBuilder.OpenConfigUi -= Open;
         Commands.RemoveHandler("/jizhang");
         windows.RemoveAllWindows();
+        fonts.Dispose();
         if (engine != null && !restoring) Save(engine.Suspend(DateTimeOffset.UtcNow));
         Store.Dispose();
         foreach (var task in saves) { try { task.GetAwaiter().GetResult(); } catch (Exception e) { Log.Error(e, "账本写入失败"); } }

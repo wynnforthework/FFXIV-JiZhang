@@ -7,6 +7,7 @@ internal interface ILedgerUiContext
     BalanceSample? Current { get; }
     string Status { get; }
     string DataDirectory { get; }
+    IDisposable PushFont(float tier);
     void SaveConfig();
     Task<string> ExportAsync();
     Task<string> BackupAsync();
