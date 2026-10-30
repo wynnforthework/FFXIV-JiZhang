@@ -17,7 +17,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
     private LedgerEntry? selected;
     private Task<string>? action;
     private string actionResult="",restorePath="";
-    private bool confirmRestore;
+    private bool confirmRestore,restoreExpanded;
     private LedgerEntry[]? source;
     private DateTime day;
     private bool exclude;
@@ -433,13 +433,14 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
             ImGui.BeginDisabled(action!=null);
             ImGui.BeginDisabled(plugin.Current==null);if(ActionButton("导出当前角色 CSV"))action=plugin.ExportAsync();ImGui.EndDisabled();ImGui.SameLine();if(ActionButton("备份全部账本"))action=plugin.BackupAsync();
             ImGui.Spacing();
-            if(ImGui.CollapsingHeader("从备份恢复")) {
+            if(ActionButton(restoreExpanded?"收起恢复选项":"从备份恢复"))restoreExpanded=!restoreExpanded;
+            if(restoreExpanded) {
                 ImGui.SetNextItemWidth(-1);ImGui.InputTextWithHint("##backup","选择备份：输入完整 .sqlite 路径",ref restorePath,1024);
                 ImGui.Checkbox("用备份替换全部角色账本（原数据将自动备份）",ref confirmRestore);
                 ImGui.BeginDisabled(!confirmRestore||!File.Exists(restorePath));if(ActionButton("恢复备份")){plugin.Restore(restorePath);confirmRestore=false;actionResult="正在恢复，完成后将重新核对余额。";}ImGui.EndDisabled();
             }
             ImGui.EndDisabled();if(actionResult.Length>0)ImGui.TextWrapped(actionResult);
-            ImGui.Spacing();ImGui.Separator();ImGui.TextUnformatted("关于与透明度");
+            ImGui.Spacing();ImGui.TextUnformatted("关于与透明度");
             ImGui.TextWrapped("本插件使用 AI 辅助开发；当前图标由 AI 生成，并经裁切与缩放处理。代码、规则和素材均需维护者持续审核与实测。");
             ImGui.TextWrapped("首次启用只建立余额基线。停用和退出游戏期间的变化单独标为差额，不计入正常收支。雇员销售款只有提取到角色后才记随身流水。");
             ImGui.TextColored(Muted,plugin.Status);
