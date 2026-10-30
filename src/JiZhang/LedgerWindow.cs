@@ -15,10 +15,12 @@ internal sealed class LedgerWindow : Window
     }
     public override void PreDraw() {
         Flags=ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse;
-        if(view.IsCompact)Flags|=ImGuiWindowFlags.NoResize;
-        SizeConstraints=new WindowSizeConstraints { MinimumSize=new(760,view.IsCompact?52:560),MaximumSize=new(float.MaxValue,float.MaxValue) };
+        view.PrepareFrame();
+        if(view.IsFolding)Flags|=ImGuiWindowFlags.NoResize;
+        SizeConstraints=new WindowSizeConstraints { MinimumSize=new(760,view.IsFolding?52:560),MaximumSize=new(float.MaxValue,float.MaxValue) };
         LedgerTheme.Push();
     }
+    public override void OnOpen()=>view.OnOpen();
     public override void PostDraw() => LedgerTheme.Pop();
     public override void Draw() { view.Draw();if(view.CloseRequested){IsOpen=false;view.ClearCloseRequest();} }
 }

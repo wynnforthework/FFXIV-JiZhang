@@ -90,3 +90,5 @@ python scripts/render-preview.py
 MIT License · [GitHub](https://github.com/wynnforthework/FFXIV-JiZhang)
 
 趋势使用折线：仅有一种收支时隐藏空系列；双方日峰值相差至少 8 倍时，自动使用上下独立刻度并明确标注，悬浮提示保留准确金额。支出分类使用圆环及金额／占比图例，超过三类时将其余合并为“其他”。
+
+动效验证可运行 `dotnet run --project tools/JiZhang.Preview -- artifacts/ui-motion --motion`，输出原生 ImGui 鼠标输入序列、多帧绘制数据及 `motion-state.json`。用 `python scripts/render-preview.py artifacts/ui-motion` 渲染；该模式使用可控时钟并断言最终交互结果。动态背景和过渡遵循 Dalamud 减少动态效果设置。

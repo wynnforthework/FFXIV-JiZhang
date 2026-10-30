@@ -21,16 +21,19 @@ unsafe {
         File.WriteAllBytes(Path.Combine(root,$"atlas-{t}.rgba"),new ReadOnlySpan<byte>(pixels,w*h*4).ToArray());
         File.WriteAllText(Path.Combine(root,$"atlas-{t}.json"),JsonSerializer.Serialize(new{width=w,height=h}));
     }
-    foreach(var scenario in new[]{("empty",false,0,1040,780,1f),("populated",true,0,1040,780,1f),("reference-size",true,0,936,768,1f),("expense-only",true,0,1040,780,1f),("income-only",true,0,1040,780,1f),("huge-income",true,0,1040,780,1f),("huge-expense",true,0,1040,780,1f),("transactions",true,1,1040,780,1f),("empty-transactions",false,1,1040,780,1f),("settings",false,2,1040,820,1f),("narrow",true,0,760,780,1f),("scaled",true,0,1040,780,1.6f)}) {
+    foreach(var scenario in (args.Contains("--motion")?Array.Empty<(string,bool,int,int,int,float)>():new[]{("empty",false,0,1040,780,1f),("populated",true,0,1040,780,1f),("reference-size",true,0,936,768,1f),("expense-only",true,0,1040,780,1f),("income-only",true,0,1040,780,1f),("huge-income",true,0,1040,780,1f),("huge-expense",true,0,1040,780,1f),("transactions",true,1,1040,780,1f),("empty-transactions",false,1,1040,780,1f),("settings",false,2,1040,820,1f),("narrow",true,0,760,780,1f),("scaled",true,0,1040,780,1.6f)})) {
         var (name,data,tab,width,height,scale)=scenario;
         var model=new PreviewContext(data,name);model.Config.Scale=scale;var view=new LedgerView(model);view.SelectTab(tab);
         io.DisplaySize=new(width,height);var open=true;
         for(var frame=0;frame<3;frame++) {
-            io.MousePos=new(470,480);ImGui.NewFrame();LedgerTheme.Push();
+            model.UiTime=frame/60d;io.MousePos=new(470,480);ImGui.NewFrame();LedgerTheme.Push();
             ImGui.SetNextWindowPos(Vector2.Zero,ImGuiCond.Always);ImGui.SetNextWindowSize(new(width,height),ImGuiCond.Always);
             if(ImGui.Begin("金币账本###JiZhang",ref open,ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse))view.Draw();
             ImGui.End();LedgerTheme.Pop();ImGui.Render();
         }
+        SaveDraw(name,width,height);
+    }
+    void SaveDraw(string name,int width,int height) {
         var dd=ImGui.GetDrawData();
         using var output=new BinaryWriter(File.Create(Path.Combine(root,name+".bin")));
         output.Write(width);output.Write(height);output.Write(dd.CmdListsCount);
@@ -40,7 +43,47 @@ unsafe {
             for(var i=0;i<list.IdxBuffer.Size;i++)output.Write(list.IdxBuffer[i]);
             for(var c=0;c<list.CmdBuffer.Size;c++){var cmd=list.CmdBuffer[c];output.Write(cmd.ClipRect.X);output.Write(cmd.ClipRect.Y);output.Write(cmd.ClipRect.Z);output.Write(cmd.ClipRect.W);output.Write(cmd.TextureId.Handle);output.Write(cmd.VtxOffset);output.Write(cmd.IdxOffset);output.Write(cmd.ElemCount);}
         }
-        Console.WriteLine($"Rendered {name}: {dd.TotalVtxCount} vertices, {dd.CmdListsCount} draw lists");
+    }
+    if(args.Contains("--motion")) {
+        var model=new PreviewContext(true,"motion");var view=new LedgerView(model);var rows=new List<object>();
+        io.DisplaySize=new(936,768);io.ConfigInputTrickleEventQueue=false;
+        var samples=new HashSet<int>{3,6,10,18,28,30,34,38,48,52,58,64,70,80,84,88,95,105,112,118,128,133,140};
+        for(var frame=0;frame<=212;frame++) {
+            model.UiTime=frame/60d;io.DeltaTime=1f/60;
+            if(frame==180)model.ReducedMotion=true;
+            var mouse=new Vector2(-100,-100);var down=false;
+            // Actual pointer press and release; each target is held for two frames.
+            if(frame is >=4 and <=6){mouse=new(30,150);down=frame<6;} // transactions
+            Vector2 Target(string id){var r=view.HitRegions[id];return new((r.X+r.Z)/2,(r.Y+r.W)/2);}
+            if(frame is >=26 and <=28){mouse=Target("direction");down=frame<28;} // direction dropdown
+            if(frame is >=36 and <=38){mouse=Target("direction-option-2");down=frame<38;} // popup item
+            if(frame is >=46 and <=48){mouse=new(30,185);down=frame<48;} // settings
+            if(frame is >=62 and <=64 && view.HitRegions.ContainsKey("transfers")){mouse=Target("transfers");down=frame<64;} // switch
+            if(frame is >=78 and <=80){mouse=new(868,25);down=frame<80;} // fold
+            if(frame is >=86 and <=88){mouse=new(868,25);down=frame<88;} // reverse before settled
+            if(frame is >=110 and <=112){mouse=new(30,85);down=frame<112;} // overview
+            if(frame is >=126 and <=128){mouse=new(332,324);down=frame<128;} // 30 days
+            if(frame is >=146 and <=148){mouse=new(868,25);down=frame<148;}
+            if(frame is >=182 and <=184){mouse=new(868,25);down=frame<184;}
+            if(frame is >=194 and <=196){mouse=new(30,185);down=frame<196;}
+            if(frame is >=208 and <=210){mouse=new(906,25);down=frame<210;}
+            io.AddMousePosEvent(mouse.X,mouse.Y);io.AddMouseButtonEvent(0,down);
+            ImGui.NewFrame();LedgerTheme.Push();
+            ImGui.SetNextWindowPos(Vector2.Zero,ImGuiCond.Always);
+            if(frame==0)ImGui.SetNextWindowSize(new(936,768),ImGuiCond.Always);
+            var open=true;
+            ImGui.Begin("金币账本###JiZhang",ref open,ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse);
+            view.Draw();var size=ImGui.GetWindowSize();
+            rows.Add(new{frame,time=model.UiTime,tab=view.ActiveTab,nav=view.NavPosition,range=view.ActiveRange,rangePosition=view.RangePosition,reveal=view.PageProgress,fold=view.FoldAmount,height=size.Y,reduced=model.ReducedMotion,closed=view.CloseRequested,direction=view.DirectionForPreview,transfers=model.Config.ExcludeTransfers});
+            ImGui.End();LedgerTheme.Pop();ImGui.Render();
+            if(samples.Contains(frame)||frame is 160 or 174 or 184 or 196 or 212)SaveDraw($"motion-{frame:000}",936,768);
+        }
+        File.WriteAllText(Path.Combine(root,"motion-state.json"),JsonSerializer.Serialize(rows,new JsonSerializerOptions{WriteIndented=true}));
+        if(view.ActiveTab!=2||!model.Config.ExcludeTransfers||!view.CloseRequested)throw new Exception("Native click sequence failed");
+        // Reduced-motion state must settle immediately, including after a mid-transition toggle.
+        model.ReducedMotion=true;view.ToggleFold();view.PrepareFrame();
+        if(view.FoldAmount!=1)throw new Exception("Reduced-motion fold did not settle");
+        Console.WriteLine("Motion input sequence exported.");
     }
     ImGui.DestroyContext();
 }
@@ -50,6 +93,8 @@ namespace JiZhang {
         public static List<ImFontPtr> Fonts{get;}=[];
         private sealed class FontScope : IDisposable { public void Dispose()=>ImGui.PopFont(); }
         public IDisposable PushFont(float tier){ImGui.PushFont(Fonts[(Config.Scale>1.3f?3:0)+(tier>=1.8f?2:tier>=1.2f?1:0)]);return new FontScope();}
+        public bool ReducedMotion{get;set;}
+        public double UiTime{get;set;}
         public Configuration Config{get;}=new();public LedgerEntry[] Entries{get;}
         public BalanceSample? Current{get;}=new(1,"示例角色",DateTimeOffset.Now,1518170,new(128,"利姆萨·罗敏萨"));
         public string Status=>"正在自动记录 · 离线示例";public string DataDirectory=>"本地账本目录";

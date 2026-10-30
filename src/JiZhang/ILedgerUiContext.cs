@@ -2,6 +2,8 @@ using JiZhang.Core;
 namespace JiZhang;
 internal interface ILedgerUiContext
 {
+    bool ReducedMotion { get; }
+    double UiTime { get; }
     Configuration Config { get; }
     LedgerEntry[] Entries { get; }
     BalanceSample? Current { get; }

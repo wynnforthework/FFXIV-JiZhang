@@ -168,6 +168,8 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
         restoreTask = Store.RestoreAsync(path);
     }
     public IDisposable PushFont(float tier) => fonts.Push(tier);
+    bool ILedgerUiContext.ReducedMotion => Interface.UiBuilder.ShouldUseReducedMotion;
+    double ILedgerUiContext.UiTime => Environment.TickCount64/1000d;
     Configuration ILedgerUiContext.Config => Config;
     LedgerEntry[] ILedgerUiContext.Entries => Entries;
     BalanceSample? ILedgerUiContext.Current => Current;

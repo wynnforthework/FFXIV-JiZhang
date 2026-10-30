@@ -6,7 +6,7 @@ using static JiZhang.LedgerTheme;
 namespace JiZhang;
 
 // Shared by the game window and the offscreen visual verification host.
-internal sealed class LedgerView(ILedgerUiContext plugin)
+internal sealed partial class LedgerView(ILedgerUiContext plugin)
 {
     private int tab;
     private string keyword="",from="",to="",location="";
@@ -28,24 +28,46 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
     internal void SelectTab(int value) => tabForPreview=value;
     private float Unit => unit>0?unit:1;
     private static string Money(long v) => v.ToString("N0",CultureInfo.CurrentCulture);
-    private static uint Color(Vector4 c) => ImGui.ColorConvertFloat4ToU32(c);
+    private static uint Color(Vector4 c) => ImGui.GetColorU32(c);
     private float unit;
     private bool resetScroll;
     internal bool CloseRequested {get;private set;}
     internal void ClearCloseRequest()=>CloseRequested=false;
-    internal bool IsCompact=>compact;
-    private bool compact;
+    private readonly UiMotion motion=new();
+    private readonly FoldMotion fold=new();
+    internal bool IsCompact=>fold.Target;
+    internal bool IsFolding=>fold.Moving||fold.Target;
+    internal float FoldAmount=>fold.Value;
+    internal float NavPosition{get;private set;}
+    internal float RangePosition{get;private set;}=1;
+    internal float PageProgress{get;private set;}=1;
+    internal Dictionary<string,Vector4> HitRegions{get;}=[];
+    internal int DirectionForPreview=>direction;
+    internal int ActiveTab=>tab;
+    internal int ActiveRange=>rangeChoice;
+    internal void PrepareFrame()=>fold.Update(plugin.UiTime,plugin.ReducedMotion);
+    internal void OnOpen(){motion.Clear();}
+    internal void ToggleFold(){fold.Toggle(plugin.UiTime);}
+    private void Navigate(int target){if(tab==target)return;tab=target;resetScroll=true;}
+
     private Vector2 expandedSize;
+    private bool wasFolding;
     public void Draw() {
         using var bodyFont=plugin.PushFont(1f);
         unit=ImGui.GetFontSize()/17f;
+        motion.Frame(plugin.UiTime,ImGui.GetIO().DeltaTime,plugin.ReducedMotion);
+        PrepareFrame();
         if(tabForPreview>=0){tab=tabForPreview;tabForPreview=-1;}
         Refresh();
         var origin=ImGui.GetWindowPos();var size=ImGui.GetWindowSize();
         var header=52*Unit;var rail=64*Unit;var footer=32*Unit;
+        if(!IsFolding&&wasFolding) {ImGui.SetWindowSize(expandedSize);size=ImGui.GetWindowSize();wasFolding=false;}
+        else if(!IsFolding)expandedSize=size;
+        else if(expandedSize.Y>0) {wasFolding=true;ImGui.SetWindowSize(new Vector2(size.X,expandedSize.Y+(header-expandedSize.Y)*fold.Value));size=ImGui.GetWindowSize();}
         Ambient(origin,size);
         Chrome(origin,size,header);
-        if(compact)return;
+        if(fold.Value>=.999f)return;
+        ImGui.PushStyleVar(ImGuiStyleVar.Alpha,ImGui.GetStyle().Alpha*(1-fold.Value));
         var draw=ImGui.GetWindowDrawList();
         draw.AddLine(origin+new Vector2(rail,header+12*Unit),origin+new Vector2(rail,size.Y-footer-12*Unit),Color(new(1,1,1,.055f)));
         ImGui.SetCursorScreenPos(origin+new Vector2(10*Unit,header+12*Unit));
@@ -55,8 +77,12 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,new Vector2(26,22)*Unit);
         if(ImGui.BeginChild("content",new Vector2(size.X-rail-6*Unit,size.Y-header-footer),false,ImGuiWindowFlags.NoBackground|ImGuiWindowFlags.AlwaysUseWindowPadding)) {
             if(resetScroll){ImGui.SetScrollY(0);resetScroll=false;}
+            PageProgress=motion.Reveal("page",tab);
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY()+(1-PageProgress)*12*Unit);
+            ImGui.PushStyleVar(ImGuiStyleVar.Alpha,ImGui.GetStyle().Alpha*Math.Max(.001f,PageProgress));
             if(tab==0)Overview();
             else {Heading(tab==1?"收支流水":"偏好与数据",tab==1?"所有金币流动，自动归档。":"记账偏好、数据备份与透明度。");if(tab==1)Transactions();else Settings();}
+        ImGui.PopStyleVar();
         }ImGui.EndChild();ImGui.PopStyleVar();
         var bottom=origin+new Vector2(0,size.Y-footer);
         draw.AddRectFilled(bottom,origin+size,Color(new(.08f,.085f,.11f,1)),0f);
@@ -65,6 +91,7 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         draw.AddText(bottom+new Vector2(36,7)*Unit,Color(Muted),plugin.Current?.CharacterName??"等待角色登录");
         var note=exclude?"统计排除资金转移  ·  数据仅存本机":"自动记账  ·  数据仅存本机";
         draw.AddText(bottom+new Vector2(size.X-ImGui.CalcTextSize(note).X-20*Unit,7*Unit),Color(Muted),note);
+        ImGui.PopStyleVar();
     }
     private void Ambient(Vector2 origin,Vector2 size) {
         var draw=ImGui.GetWindowDrawList();
@@ -72,9 +99,9 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         void Blob(Vector2 center,float radius,Vector4 color,float alpha) {
             for(var i=5;i>=1;i--)draw.AddCircleFilled(center,radius*i/5,Color(color with {W=alpha*(1-(i-1)/5f)}),64);
         }
-        Blob(origin+size*new Vector2(.20f,.16f),size.X*.45f,Accent,.055f);
-        Blob(origin+size*new Vector2(.86f,.30f),size.X*.40f,new(.40f,.68f,.98f,1),.040f);
-        Blob(origin+size*new Vector2(.55f,.96f),size.X*.42f,new(.95f,.45f,.78f,1),.035f);
+        Blob(origin+size*new Vector2(.20f+.08f*motion.Wave(16),.14f+.06f*motion.Wave(21)),size.X*.45f,Accent,.055f);
+        Blob(origin+size*new Vector2(.86f+.06f*motion.Wave(19),.32f+.08f*motion.Wave(14)),size.X*.40f,new(.40f,.68f,.98f,1),.040f);
+        Blob(origin+size*new Vector2(.55f+.10f*motion.Wave(23),.96f+.05f*motion.Wave(17)),size.X*.42f,new(.95f,.45f,.78f,1),.035f);
         draw.PopClipRect();
     }
     private void Chrome(Vector2 origin,Vector2 size,float height) {
@@ -84,6 +111,7 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         // The title has a real drag hit region; controls retain their own hit regions.
         ImGui.SetCursorScreenPos(origin);
         ImGui.InvisibleButton("title-drag",new(size.X-94*Unit,height));
+        if(ImGui.IsItemHovered()&&ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))ToggleFold();
         if(ImGui.IsItemActive()&&ImGui.IsMouseDragging(ImGuiMouseButton.Left))ImGui.SetWindowPos(origin+ImGui.GetIO().MouseDelta);
         BookIcon(origin+new Vector2(26,26)*Unit,12*Unit,Gold);
         draw.AddText(origin+new Vector2(51,17)*Unit,Color(Ink),"金币账本");
@@ -99,13 +127,15 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
             ImGui.SetCursorScreenPos(pos);
             if(ImGui.InvisibleButton(i==0?"collapse":"close",new Vector2(30,30)*Unit)) {
                 if(i==1)CloseRequested=true;
-                else {compact=!compact;if(compact){expandedSize=size;ImGui.SetWindowSize(new Vector2(size.X,height));}else ImGui.SetWindowSize(expandedSize);}
+                else ToggleFold();
             }
-            var color=ImGui.IsItemHovered()?Ink:Muted;
-            if(ImGui.IsItemHovered())draw.AddRectFilled(pos,pos+new Vector2(30,30)*Unit,Color(Surface2),7*Unit);
+            var hover=motion.Approach("chrome-hover-"+i,ImGui.IsItemHovered()?1:0,18);
+            var color=Vector4.Lerp(Muted,Ink,hover);
+            if(hover>.001f)draw.AddRectFilled(pos,pos+new Vector2(30,30)*Unit,Color(Surface2 with {W=hover}),7*Unit);
+            if(ImGui.IsItemHovered())ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
             var center=pos+new Vector2(15,15)*Unit;
             if(i==1){draw.AddLine(center-new Vector2(5,5)*Unit,center+new Vector2(5,5)*Unit,Color(color),2*Unit);draw.AddLine(center+new Vector2(-5,5)*Unit,center+new Vector2(5,-5)*Unit,Color(color),2*Unit);}
-            else {draw.AddLine(center+new Vector2(-6,compact?3:-3)*Unit,center+new Vector2(0,compact?-3:3)*Unit,Color(color),2*Unit);draw.AddLine(center+new Vector2(0,compact?-3:3)*Unit,center+new Vector2(6,compact?3:-3)*Unit,Color(color),2*Unit);}
+            else {draw.AddLine(center+new Vector2(-6,IsCompact?3:-3)*Unit,center+new Vector2(0,IsCompact?-3:3)*Unit,Color(color),2*Unit);draw.AddLine(center+new Vector2(0,IsCompact?-3:3)*Unit,center+new Vector2(6,IsCompact?3:-3)*Unit,Color(color),2*Unit);}
         }
     }
     private void BookIcon(Vector2 center,float radius,Vector4 color) {
@@ -127,14 +157,20 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
             .GroupBy(e=>e.Category).Select(g=>(g.Key,-g.Sum(e=>e.Amount))).OrderByDescending(g=>g.Item2).ToArray();
     }
     private void Sidebar() {
-        var draw=ImGui.GetWindowDrawList();
+        var draw=ImGui.GetWindowDrawList();var origin=ImGui.GetCursorScreenPos();
+        NavPosition=motion.Approach("nav-position",tab,16);
+        var indicator=origin+new Vector2(0,50*NavPosition)*Unit;
+        SurfaceBox(indicator,indicator+new Vector2(42,42)*Unit,new(.23f,.19f,.34f,1),new(.43f,.33f,.62f,1),11*Unit);
+        draw.AddRectFilled(indicator+new Vector2(-8,10)*Unit,indicator+new Vector2(-5,32)*Unit,Color(Accent),2*Unit);
         for(var i=0;i<3;i++) {
-            var pos=ImGui.GetCursorScreenPos();var end=pos+new Vector2(42,42)*Unit;
-            if(ImGui.InvisibleButton("nav-"+i,new Vector2(42,42)*Unit)){tab=i;resetScroll=true;}
-            var hovered=ImGui.IsItemHovered();var active=tab==i;var color=active?new Vector4(.85f,.73f,1,1):hovered?Ink:Muted;
-            if(active||hovered) {
-                SurfaceBox(pos,end,active?new(.23f,.19f,.34f,1):Surface2,active?new(.43f,.33f,.62f,1):Border,11*Unit);
-            }
+            var pos=origin+new Vector2(0,i*50)*Unit;var end=pos+new Vector2(42,42)*Unit;
+            ImGui.SetCursorScreenPos(pos);
+            if(ImGui.InvisibleButton("nav-"+i,new Vector2(42,42)*Unit)){Navigate(i);}
+            var hovered=ImGui.IsItemHovered();var active=tab==i;
+            var hover=motion.Approach("nav-hover-"+i,hovered?1:0,18);
+            var color=active?Ink:Vector4.Lerp(Muted,Ink,hover*.7f);
+            if(!active&&hover>.001f)draw.AddRectFilled(pos,end,Color(Surface2 with {W=hover*.8f}),11*Unit);
+            if(hovered)ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
             var center=(pos+end)/2;
             if(i==0) {
                 draw.AddLine(center+new Vector2(-9,8)*Unit,center+new Vector2(-9,-8)*Unit,Color(color),2*Unit);
@@ -148,7 +184,7 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
                 draw.AddLine(new(center.X-9*Unit,y),new(center.X+9*Unit,y),Color(color),2*Unit);
                 draw.AddCircleFilled(new(center.X+(j%2==0?-3:4)*Unit,y),3*Unit,Color(color));
             }
-            if(hovered){ImGui.BeginTooltip();ImGui.TextUnformatted(new[]{"资产概览","收支流水","偏好与数据"}[i]);ImGui.EndTooltip();}
+            if(hovered)Tooltip(new[]{"资产概览","收支流水","偏好与数据"}[i]);
             ImGui.Dummy(new(0,8*Unit));
         }
     }
@@ -156,7 +192,7 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         var draw=ImGui.GetWindowDrawList();
         for(var i=3;i>=1;i--)draw.AddRectFilled(min-new Vector2(i*2*Unit),max+new Vector2(i*2*Unit)+new Vector2(0,3*Unit),Color(new(0,0,0,.035f)),rounding+i*Unit);
         var start=draw.VtxBuffer.Size;draw.AddRectFilled(min,max,Color(Vector4.One),rounding);
-        ImGuiP.ShadeVertsLinearColorGradientKeepAlpha(draw,start,draw.VtxBuffer.Size,min,new Vector2(min.X,max.Y),Color(Vector4.Lerp(fill,Accent,.06f)),Color(fill));
+        ImGuiP.ShadeVertsLinearColorGradientKeepAlpha(draw,start,draw.VtxBuffer.Size,min,new Vector2(min.X,max.Y),ImGui.ColorConvertFloat4ToU32(Vector4.Lerp(fill,Accent,.06f)),ImGui.ColorConvertFloat4ToU32(fill));
         draw.AddRect(min,max,Color(border),rounding);
         draw.AddLine(min+new Vector2(rounding,1*Unit),new(max.X-rounding,min.Y+Unit),Color(new(1,1,1,.055f)),Unit);
     }
@@ -201,12 +237,16 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         ImGui.Dummy(new(1,4*Unit));
         var rangeOrigin=ImGui.GetCursorScreenPos();var rangeWidth=Math.Min(300*Unit,ImGui.GetContentRegionAvail().X);
         SurfaceBox(rangeOrigin,rangeOrigin+new Vector2(rangeWidth,36*Unit),new(.082f,.09f,.118f,.95f),new(.235f,.262f,.33f,.65f),18*Unit);
+        RangePosition=motion.Approach("range-position",rangeChoice,18);
+        var indicatorStart=rangeOrigin+new Vector2(3*Unit+RangePosition*(rangeWidth-6*Unit)/3,3*Unit);
+        SurfaceBox(indicatorStart,indicatorStart+new Vector2((rangeWidth-6*Unit)/3,30*Unit),new(.27f,.22f,.38f,1),new(.62f,.47f,.80f,.65f),15*Unit);
         for(var i=0;i<3;i++) {
             var start=rangeOrigin+new Vector2(3*Unit+i*(rangeWidth-6*Unit)/3,3*Unit);var size=new Vector2((rangeWidth-6*Unit)/3,30*Unit);
             ImGui.SetCursorScreenPos(start);
             if(ImGui.InvisibleButton("range-"+i,size)){rangeChoice=i;source=null;Refresh();}
-            if(i==rangeChoice)SurfaceBox(start,start+size,new(.27f,.22f,.38f,1),new(.62f,.47f,.80f,.65f),15*Unit);
-            else if(ImGui.IsItemHovered())ImGui.GetWindowDrawList().AddRectFilled(start,start+size,Color(Surface2),15*Unit);
+            var hover=motion.Approach("range-hover-"+i,ImGui.IsItemHovered()?1:0,18);
+            if(i!=rangeChoice&&hover>.001f)ImGui.GetWindowDrawList().AddRectFilled(start,start+size,Color(Surface2 with {W=hover}),15*Unit);
+            if(ImGui.IsItemHovered())ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
             var text=new[]{"最近 7 天","最近 14 天","最近 30 天"}[i];
             ImGui.GetWindowDrawList().AddText(start+(size-ImGui.CalcTextSize(text))/2,Color(i==rangeChoice?Ink:Muted),text);
         }
@@ -226,7 +266,7 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
             else DrawCategories();
         }EndPanel();
         if(Panel("recent",new(-1,plugin.Entries.Length==0?115*Unit:165*Unit))) {
-            ImGui.TextUnformatted("最近流水");ImGui.SameLine();if(ImGui.SmallButton("查看全部"))tab=1;
+            ImGui.TextUnformatted("最近流水");ImGui.SameLine();if(ImGui.SmallButton("查看全部"))Navigate(1);
             if(plugin.Entries.Length==0){ImGui.Spacing();ImGui.TextColored(Muted,"账本已就绪，无需手动记账。");ImGui.TextColored(Muted,"下一次传送、购物或领取金币后，流水会自动出现在这里。");}
             else foreach(var e in plugin.Entries.Take(3)) {
                 ImGui.Separator();
@@ -285,7 +325,7 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
             ImGui.Indent(14*Unit);ImGui.TextUnformatted(item.Label);ImGui.SameLine();
             ImGui.TextColored(Muted,$"{(double)item.Amount/monthTotal.Expense:P0} · {Money(item.Amount)}");ImGui.Unindent(14*Unit);
         }
-        if(groups.Length>3&&ImGui.SmallButton("查看分类流水"))tab=1;
+        if(groups.Length>3&&ImGui.SmallButton("查看分类流水"))Navigate(1);
     }
     private void DrawTrend() {
         var income=trend.Max(t=>t.Income);var expense=trend.Max(t=>t.Expense);
@@ -325,9 +365,7 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         if(ImGui.IsItemHovered()&&ImGui.GetMousePos().X>=origin.X+left) {
             var i=Math.Clamp((int)Math.Round((ImGui.GetMousePos().X-origin.X-left)/step),0,trend.Length-1);
             if(trend[i].Income!=0||trend[i].Expense!=0) {
-                ImGui.PushStyleColor(ImGuiCol.PopupBg,new Vector4(.10f,.16f,.13f,1));ImGui.PushStyleColor(ImGuiCol.Text,Vector4.One);
-                try {ImGui.BeginTooltip();ImGui.TextUnformatted(day.AddDays(i-(trend.Length-1)).ToString("yyyy-MM-dd"));ImGui.TextUnformatted($"收入  {Money(trend[i].Income)} GIL");ImGui.TextUnformatted($"支出  {Money(trend[i].Expense)} GIL");ImGui.EndTooltip();}
-                finally {ImGui.PopStyleColor(2);}
+                Tooltip($"{day.AddDays(i-(trend.Length-1)):yyyy-MM-dd}\n收入  {Money(trend[i].Income)} GIL\n支出  {Money(trend[i].Expense)} GIL");
             }
         }
     }
@@ -340,9 +378,10 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
                 ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);if(ImGui.InputTextWithHint("##from","开始日期 YYYY-MM-DD",ref from,10))page=0;
                 ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);if(ImGui.InputTextWithHint("##to","结束日期 YYYY-MM-DD",ref to,10))page=0;
                 ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);
-                if(ImGui.BeginCombo("##direction",new[]{"全部收支","收入","支出"}[direction])) {for(var i=0;i<3;i++)if(ImGui.Selectable(new[]{"全部收支","收入","支出"}[i],direction==i)){direction=i;page=0;}ImGui.EndCombo();}
+                if(Dropdown("direction",new[]{"全部收支","收入","支出"},ref direction))page=0;
                 ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);
-                if(ImGui.BeginCombo("##category",category?.Label()??"全部分类")){if(ImGui.Selectable("全部分类",category==null)){category=null;page=0;}foreach(var c in Enum.GetValues<Category>())if(ImGui.Selectable(c.Label(),category==c)){category=c;page=0;}ImGui.EndCombo();}
+                var categories=Enum.GetValues<Category>();var categoryIndex=category==null?0:Array.IndexOf(categories,category.Value)+1;
+                if(Dropdown("category",new[]{"全部分类"}.Concat(categories.Select(c=>c.Label())).ToArray(),ref categoryIndex)){category=categoryIndex==0?null:categories[categoryIndex-1];page=0;}
                 ImGui.EndTable();
             }
             if(ImGui.SmallButton("今日")){from=to=DateTime.Today.ToString("yyyy-MM-dd");page=0;}ImGui.SameLine();
@@ -383,29 +422,27 @@ internal sealed class LedgerView(ILedgerUiContext plugin)
         }
     }
     private void Settings() {
-        if(Panel("preferences",new(-1,210*Unit))) {
-            ImGui.TextUnformatted("记账偏好");ImGui.Spacing();
-            var transfers=plugin.Config.ExcludeTransfers;if(ImGui.Checkbox("统计时排除雇员与部队资金转移",ref transfers)){plugin.Config.ExcludeTransfers=transfers;plugin.SaveConfig();}
-            var experimental=plugin.Config.EnableExperimentalClassification;if(ImGui.Checkbox("根据交互窗口辅助分类（实验性）",ref experimental)){plugin.Config.EnableExperimentalClassification=experimental;plugin.SaveConfig();}
+        BeginSettingsCard("记账偏好"); {
+            var transfers=plugin.Config.ExcludeTransfers;if(ToggleRow("transfers","统计排除资金转移","只排除已识别的雇员及部队转账，普通交易仍保留。",ref transfers)){plugin.Config.ExcludeTransfers=transfers;plugin.SaveConfig();}
+            var experimental=plugin.Config.EnableExperimentalClassification;if(ToggleRow("classification","交互窗口辅助分类","实验性：根据商店、修理等窗口推断用途，可能误判。",ref experimental)){plugin.Config.EnableExperimentalClassification=experimental;plugin.SaveConfig();}
             ImGui.PushTextWrapPos(0);ImGui.TextColored(Muted,"市场确认与系统消息始终参与金额匹配；此开关仅控制商店、修理等窗口推断。缺少证据时保留未分类。");ImGui.PopTextWrapPos();
             var scale=plugin.Config.Scale;ImGui.SetNextItemWidth(210*Unit);if(ImGui.SliderFloat("界面缩放",ref scale,.8f,1.6f,"%.2f")){plugin.Config.Scale=scale;plugin.SaveConfig();}
-        }EndPanel();
-        if(Panel("data",new(-1,0))) {
-            ImGui.TextUnformatted("本地数据");ImGui.TextWrapped(plugin.DataDirectory);
+        }EndSettingsCard();
+        BeginSettingsCard("本地数据"); {ImGui.TextWrapped(plugin.DataDirectory);
             if(action is {IsCompleted:true}){try{actionResult=action.GetAwaiter().GetResult();}catch(Exception e){actionResult="操作失败："+e.Message;}action=null;}
             ImGui.BeginDisabled(action!=null);
-            ImGui.BeginDisabled(plugin.Current==null);if(ImGui.Button("导出当前角色 CSV"))action=plugin.ExportAsync();ImGui.EndDisabled();ImGui.SameLine();if(ImGui.Button("备份全部账本"))action=plugin.BackupAsync();
+            ImGui.BeginDisabled(plugin.Current==null);if(ActionButton("导出当前角色 CSV"))action=plugin.ExportAsync();ImGui.EndDisabled();ImGui.SameLine();if(ActionButton("备份全部账本"))action=plugin.BackupAsync();
             ImGui.Spacing();
             if(ImGui.CollapsingHeader("从备份恢复")) {
                 ImGui.SetNextItemWidth(-1);ImGui.InputTextWithHint("##backup","选择备份：输入完整 .sqlite 路径",ref restorePath,1024);
                 ImGui.Checkbox("用备份替换全部角色账本（原数据将自动备份）",ref confirmRestore);
-                ImGui.BeginDisabled(!confirmRestore||!File.Exists(restorePath));if(ImGui.Button("恢复备份")){plugin.Restore(restorePath);confirmRestore=false;actionResult="正在恢复，完成后将重新核对余额。";}ImGui.EndDisabled();
+                ImGui.BeginDisabled(!confirmRestore||!File.Exists(restorePath));if(ActionButton("恢复备份")){plugin.Restore(restorePath);confirmRestore=false;actionResult="正在恢复，完成后将重新核对余额。";}ImGui.EndDisabled();
             }
             ImGui.EndDisabled();if(actionResult.Length>0)ImGui.TextWrapped(actionResult);
             ImGui.Spacing();ImGui.Separator();ImGui.TextUnformatted("关于与透明度");
             ImGui.TextWrapped("本插件使用 AI 辅助开发；当前图标由 AI 生成，并经裁切与缩放处理。代码、规则和素材均需维护者持续审核与实测。");
             ImGui.TextWrapped("首次启用只建立余额基线。停用和退出游戏期间的变化单独标为差额，不计入正常收支。雇员销售款只有提取到角色后才记随身流水。");
             ImGui.TextColored(Muted,plugin.Status);
-        }EndPanel();
+        }EndSettingsCard();
     }
 }
