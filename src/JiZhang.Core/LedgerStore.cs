@@ -48,6 +48,7 @@ public sealed class LedgerStore : IDisposable
         return completion.Task;
     }
     public Task SaveAsync(Commit commit) => Run(db => {
+        if (LastError != null) throw new IOException("先前写入失败，已停止推进账本检查点：" + LastError);
         using var tx = db.BeginTransaction();
         var inserted = new List<LedgerEntry>();
         foreach (var entry in commit.Entries) {

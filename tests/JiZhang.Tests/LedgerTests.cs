@@ -79,4 +79,18 @@ public sealed class LedgerTests
             var bad=Path.Combine(path,"invalid.sqlite");await File.WriteAllTextAsync(bad,"broken");await Assert.ThrowsAnyAsync<Exception>(()=>store.RestoreAsync(bad));Assert.Single(await store.LoadEntriesAsync(1));
         } finally {Directory.Delete(path,true);}
     }
+    [Fact] public async Task FailedWriteCannotAdvanceLaterCheckpoints() {
+        var path=Path.Combine(Path.GetTempPath(),"JiZhang-tests-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(path);
+        try {using var store=new LedgerStore(Path.Combine(path,"ledger.sqlite"));await store.SaveAsync(new(S(1000),[]));
+            // Inject an actual SQLite write failure without requiring filesystem-specific permissions.
+            using(var db=new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Path.Combine(path,"ledger.sqlite")};Pooling=False")) {
+                db.Open();using var cmd=db.CreateCommand();cmd.CommandText="CREATE TRIGGER reject_entries BEFORE INSERT ON entries BEGIN SELECT RAISE(ABORT,'simulated full disk'); END;";cmd.ExecuteNonQuery();
+            }
+            var entry=new LedgerEntry("failed",1,"角色",T,1000,900,new(1,"test"));
+            await Assert.ThrowsAnyAsync<Exception>(()=>store.SaveAsync(new(S(900),[entry])));
+            await Assert.ThrowsAsync<IOException>(()=>store.SaveAsync(new(S(800),[])));
+            Assert.Equal(1000,Assert.Single(await store.LoadStatesAsync()).Balance);Assert.Empty(await store.LoadEntriesAsync(1));Assert.NotNull(store.LastError);
+        } finally {Directory.Delete(path,true);}
+    }
+
 }

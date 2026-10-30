@@ -42,6 +42,7 @@ internal sealed class LedgerWindow(Plugin plugin)
         PushTheme();
         try {
             ImGui.SetNextWindowSize(new(1020, 780), ImGuiCond.FirstUseEver);
+            ImGui.SetNextWindowSizeConstraints(new(760,620),new(float.MaxValue,float.MaxValue));
             var visible = ImGui.Begin("金币账本###JiZhang", ref IsOpen, ImGuiWindowFlags.NoCollapse);
             try { if (visible) {
                 ImGui.SetWindowFontScale(plugin.Config.Scale);
