@@ -4,6 +4,7 @@ using Dalamud.Game.Chat;
 using Dalamud.Game.Network.Structures;
 using Dalamud.Game.Text;
 using Dalamud.IoC;
+using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
@@ -11,7 +12,7 @@ using JiZhang.Core;
 using Lumina.Excel.Sheets;
 
 namespace JiZhang;
-public sealed class Plugin : IDalamudPlugin
+public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
 {
     [PluginService] internal static IDalamudPluginInterface Interface { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
@@ -34,6 +35,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ConcurrentQueue<Evidence> incoming = new();
     private readonly List<Task> saves = [];
     private readonly LedgerWindow window;
+    private readonly WindowSystem windows = new("JiZhang");
     private Task<LedgerEntry[]>? read;
     private ulong readCharacter;
     private DateTimeOffset nextRead;
@@ -52,6 +54,7 @@ public sealed class Plugin : IDalamudPlugin
         Store = new(Path.Combine(Interface.GetPluginConfigDirectory(), "ledger.sqlite"));
         initial = Store.LoadStatesAsync();
         window = new(this);
+        windows.AddWindow(window);
         Commands.AddHandler("/jizhang", new CommandInfo((_, _) => window.IsOpen = !window.IsOpen) { HelpMessage = "打开金币账本" });
         Interface.UiBuilder.Draw += Draw;
         Interface.UiBuilder.OpenMainUi += Open;
@@ -61,7 +64,7 @@ public sealed class Plugin : IDalamudPlugin
         Market.PurchaseRequested += OnMarketRequest;
         Market.ItemPurchased += OnMarketPurchase;
     }
-    private void Draw() => window.Draw();
+    private void Draw() => windows.Draw();
     private void Open() => window.IsOpen = true;
     internal void SaveConfig() => Interface.SavePluginConfig(Config);
     private void Save(IEnumerable<Commit> commits) {
@@ -163,12 +166,22 @@ public sealed class Plugin : IDalamudPlugin
         lock (marketLock) request = null;
         restoreTask = Store.RestoreAsync(path);
     }
+    Configuration ILedgerUiContext.Config => Config;
+    LedgerEntry[] ILedgerUiContext.Entries => Entries;
+    BalanceSample? ILedgerUiContext.Current => Current;
+    string ILedgerUiContext.Status => Status;
+    string ILedgerUiContext.DataDirectory => Store.DirectoryPath;
+    void ILedgerUiContext.SaveConfig() => SaveConfig();
+    Task<string> ILedgerUiContext.ExportAsync() => Current is { } current ? Store.ExportAsync(current.CharacterId) : Task.FromException<string>(new InvalidOperationException("请先登录角色"));
+    Task<string> ILedgerUiContext.BackupAsync() => Store.BackupAsync();
+    void ILedgerUiContext.Restore(string path) => Restore(path);
     public void Dispose() {
         disposed = true;
         Framework.Update -= Update; Chat.ChatMessage -= OnChat;
         Market.PurchaseRequested -= OnMarketRequest; Market.ItemPurchased -= OnMarketPurchase;
         Interface.UiBuilder.Draw -= Draw; Interface.UiBuilder.OpenMainUi -= Open; Interface.UiBuilder.OpenConfigUi -= Open;
         Commands.RemoveHandler("/jizhang");
+        windows.RemoveAllWindows();
         if (engine != null && !restoring) Save(engine.Suspend(DateTimeOffset.UtcNow));
         Store.Dispose();
         foreach (var task in saves) { try { task.GetAwaiter().GetResult(); } catch (Exception e) { Log.Error(e, "账本写入失败"); } }

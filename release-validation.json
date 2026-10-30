@@ -1,1 +1,7 @@
-{"version":"0.1.0.0","passed":false,"validatedAt":null,"evidence":null,"reason":"本机构建和核心测试已完成；国服游戏内及订阅安装验收待完成。"}
+{
+  "version": "0.1.1.0",
+  "passed": false,
+  "validatedAt": null,
+  "evidence": null,
+  "reason": "用户已在游戏中查看旧版界面并反馈；新版完成离线视觉检查，真实交易和新版游戏内验收仍待完成。"
+}

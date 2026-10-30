@@ -1,0 +1,11 @@
+<Project>
+  <Target Name="PackageJiZhang" AfterTargets="Build">
+    <Copy SourceFiles="$(OutputPath)runtimes/win-x64/native/e_sqlite3.dll" DestinationFolder="$(OutputPath)" />
+    <Copy SourceFiles="$(ProjectDir)../../docs/AI_USAGE.md" DestinationFolder="$(OutputPath)" />
+    <Copy SourceFiles="$(ProjectDir)../../LICENSE" DestinationFolder="$(OutputPath)" />
+    <DalamudPackager ProjectDir="$(ProjectDir)" OutputPath="$(OutputPath)" AssemblyName="$(AssemblyName)"
+      MakeZip="true" HandleImages="false" Author="$(Author)" Name="$(Name)" Punchline="$(Punchline)" Description="$(Description)"
+      RepoUrl="$(RepoUrl)" Tags="$(Tags)" DalamudApiLevel="$(DalamudApiLevel)" IconUrl="$(IconUrl)"
+      Include="JiZhang.dll;JiZhang.Core.dll;JiZhang.json;JiZhang.deps.json;Microsoft.Data.Sqlite.dll;SQLitePCLRaw.batteries_v2.dll;SQLitePCLRaw.core.dll;SQLitePCLRaw.provider.e_sqlite3.dll;e_sqlite3.dll;runtimes/win-x64/native/e_sqlite3.dll;images/icon.png;AI_USAGE.md;LICENSE" />
+  </Target>
+</Project>
