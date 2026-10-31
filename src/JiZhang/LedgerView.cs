@@ -418,6 +418,11 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
             ImGui.BeginDisabled(action!=null);
             ImGui.BeginDisabled(plugin.Current==null);if(ActionButton("导出当前角色 CSV"))action=plugin.ExportAsync();ImGui.EndDisabled();ImGui.SameLine();if(ActionButton("备份全部账本"))action=plugin.BackupAsync();
             ImGui.Spacing();
+            ImGui.BeginDisabled(plugin.Current==null);
+            if(ActionButton("重新识别历史分类")){selected=null;action=plugin.ReclassifyAsync();}
+            ImGui.EndDisabled();
+            ImGui.TextWrapped("仅更新已保存原始证据且金额吻合的未分类流水；修改前自动备份。只有余额变化的旧流水保持原样。");
+            ImGui.Spacing();
             if(ActionButton(restoreExpanded?"收起恢复选项":"从备份恢复"))restoreExpanded=!restoreExpanded;
             if(restoreExpanded) {
                 ImGui.SetNextItemWidth(-1);ImGui.InputTextWithHint("##backup","选择备份：输入完整 .sqlite 路径",ref restorePath,1024);

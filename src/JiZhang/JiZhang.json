@@ -3,7 +3,7 @@
   "Name": "金币账本",
   "InternalName": "JiZhang",
   "AssemblyVersion": "0.1.1.0",
-  "Description": "暖纸白与墨绿界面的本地自动金币账本。自动记录金币变化，来源无法确认时保留未分类。 本插件使用 AI 辅助开发，图标由 AI 生成。",
+  "Description": "自动记录当前角色的金币收入与支出，查看交易时间、地点、用途及余额变化。提供当月、当年和全部历史的收支趋势与支出去向，支持流水筛选、分类详情、CSV 导出、账本备份及按角色独立保存。",
   "Punchline": "金币流向，一目了然",
   "ApplicableVersion": "any",
   "DalamudApiLevel": 15,
@@ -15,5 +15,10 @@
     "记账"
   ],
   "LoadRequiredState": 0,
-  "IconUrl": "https://raw.githubusercontent.com/wynnforthework/FFXIV-JiZhang/main/images/icon.png"
+  "IconUrl": "https://raw.githubusercontent.com/wynnforthework/FFXIV-JiZhang/main/images/icon.png",
+  "ImageUrls": [
+    "https://raw.githubusercontent.com/wynnforthework/FFXIV-JiZhang/main/images/screenshots/overview.png",
+    "https://raw.githubusercontent.com/wynnforthework/FFXIV-JiZhang/main/images/screenshots/transactions.png",
+    "https://raw.githubusercontent.com/wynnforthework/FFXIV-JiZhang/main/images/screenshots/settings.png"
+  ]
 }

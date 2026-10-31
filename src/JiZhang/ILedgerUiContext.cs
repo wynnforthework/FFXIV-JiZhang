@@ -13,5 +13,6 @@ internal interface ILedgerUiContext
     void SaveConfig();
     Task<string> ExportAsync();
     Task<string> BackupAsync();
+    Task<string> ReclassifyAsync();
     void Restore(string path);
 }

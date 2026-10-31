@@ -21,7 +21,7 @@ unsafe {
         File.WriteAllBytes(Path.Combine(root,$"atlas-{t}.rgba"),new ReadOnlySpan<byte>(pixels,w*h*4).ToArray());
         File.WriteAllText(Path.Combine(root,$"atlas-{t}.json"),JsonSerializer.Serialize(new{width=w,height=h}));
     }
-    foreach(var scenario in (args.Contains("--motion")?Array.Empty<(string,bool,int,int,int,float)>():new[]{("empty",false,0,1040,780,1f),("populated",true,0,1040,780,1f),("mixed-categories",true,0,1040,780,1f),("reference-size",true,0,936,768,1f),("scrolled",true,0,936,768,1f),("year",true,0,1040,780,1f),("all",true,0,1040,780,1f),("expense-only",true,0,1040,780,1f),("income-only",true,0,1040,780,1f),("huge-income",true,0,1040,780,1f),("huge-expense",true,0,1040,780,1f),("transactions",true,1,1040,780,1f),("empty-transactions",false,1,1040,780,1f),("settings",false,2,1040,820,1f),("narrow",true,0,760,780,1f),("scaled",true,0,1040,780,1.6f)})) {
+    foreach(var scenario in (args.Contains("--motion")?Array.Empty<(string,bool,int,int,int,float)>():new[]{("empty",false,0,1040,780,1f),("populated",true,0,1040,780,1f),("marketing-overview",true,0,1040,1000,1f),("mixed-categories",true,0,1040,780,1f),("reference-size",true,0,936,768,1f),("scrolled",true,0,936,768,1f),("year",true,0,1040,780,1f),("all",true,0,1040,780,1f),("expense-only",true,0,1040,780,1f),("income-only",true,0,1040,780,1f),("huge-income",true,0,1040,780,1f),("huge-expense",true,0,1040,780,1f),("transactions",true,1,1040,780,1f),("empty-transactions",false,1,1040,780,1f),("settings",false,2,1040,960,1f),("narrow",true,0,760,780,1f),("scaled",true,0,1040,780,1.6f)})) {
         var (name,data,tab,width,height,scale)=scenario;
         var model=new PreviewContext(data,name);model.Config.Scale=scale;var view=new LedgerView(model);view.SelectTab(tab);
         io.DisplaySize=new(width,height);var open=true;
@@ -121,6 +121,6 @@ namespace JiZhang {
                 list.Add(new(i.ToString(),1,"示例角色",DateTimeOffset.Now.AddDays(-i),balance-amount,balance,new(128,"利姆萨·罗敏萨"),amount>0?Category.QuestReward:scenario=="mixed-categories"?new[]{Category.Teleport,Category.Repair,Category.NpcPurchase,Category.MarketPurchase,Category.PlayerTrade,Category.RetainerTransfer}[i%6]:i%2==0?Category.MarketPurchase:Category.Teleport));
             }Entries=list.ToArray();
         }
-        public void SaveConfig(){}public Task<string> ExportAsync()=>Task.FromResult("预览");public Task<string> BackupAsync()=>Task.FromResult("预览");public void Restore(string path){}
+        public void SaveConfig(){}public Task<string> ExportAsync()=>Task.FromResult("预览");public Task<string> BackupAsync()=>Task.FromResult("预览");public Task<string> ReclassifyAsync()=>Task.FromResult("预览");public void Restore(string path){}
     }
 }

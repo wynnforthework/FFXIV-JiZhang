@@ -194,6 +194,13 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
     Task<string> ILedgerUiContext.ExportAsync() => Current is { } current ? Store.ExportAsync(current.CharacterId) : Task.FromException<string>(new InvalidOperationException("请先登录角色"));
     Task<string> ILedgerUiContext.BackupAsync() => Store.BackupAsync();
     void ILedgerUiContext.Restore(string path) => Restore(path);
+    async Task<string> ILedgerUiContext.ReclassifyAsync() {
+        if(Current is not {} current)throw new InvalidOperationException("请先登录角色");
+        var result=await Store.ReclassifyAsync(current.CharacterId);
+        if(result.Updated>0)await Framework.RunOnFrameworkThread(()=>{read=null;dirty=true;nextRead=DateTimeOffset.MinValue;});
+        return $"已检查 {result.Examined} 笔未分类流水，更新 {result.Updated} 笔；其余 {result.Unchanged} 笔缺少可靠证据，保持原样。"+
+            (result.BackupPath==null?"":"\n修改前备份："+result.BackupPath);
+    }
     public void Dispose() {
         disposed = true;
         ticketTeleportHook?.Dispose(); teleportHook?.Dispose(); teleport.Reset(); systemMessages.Reset();

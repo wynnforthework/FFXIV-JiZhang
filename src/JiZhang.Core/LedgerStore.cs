@@ -5,7 +5,7 @@ using System.Threading.Channels;
 using Microsoft.Data.Sqlite;
 namespace JiZhang.Core;
 
-public sealed class LedgerStore : IDisposable
+public sealed partial class LedgerStore : IDisposable
 {
     private const int SchemaVersion = 1;
     private readonly Channel<Action<SqliteConnection>> queue = Channel.CreateUnbounded<Action<SqliteConnection>>(new() { SingleReader = true });
