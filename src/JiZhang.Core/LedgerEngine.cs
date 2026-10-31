@@ -9,13 +9,15 @@ public sealed class LedgerEngine
     private readonly List<Evidence> evidence = [];
     private readonly HashSet<string> evidenceIds = [];
     private ulong? active;
+    private readonly Dictionary<string,DateTimeOffset> deferred=[];
+    public void ReleaseDeferred()=>deferred.Clear();
     public LedgerEngine(IEnumerable<BalanceSample>? previous = null) => states = previous?.ToDictionary(x => x.CharacterId) ?? [];
     public IReadOnlyDictionary<ulong, BalanceSample> States => states;
     public void AddEvidence(Evidence e) {
         if (e.CharacterId != active || e.Amount == 0 || !evidenceIds.Add(e.Id)) return;
         evidence.Add(e);
     }
-    public IReadOnlyList<Commit> Observe(BalanceSample s) {
+    public IReadOnlyList<Commit> Observe(BalanceSample s, DateTimeOffset? classificationDeadline = null) {
         if (s.CharacterId == 0 || s.Balance is < 0 or > 999999999) return [];
         var commits = new List<Commit>();
         if (active != s.CharacterId) {
@@ -30,7 +32,10 @@ public sealed class LedgerEngine
             return commits;
         }
         var before = states[s.CharacterId];
-        if (before.Balance != s.Balance) pending.Add(New(s, before.Balance));
+        if (before.Balance != s.Balance) {
+            var entry=New(s,before.Balance);pending.Add(entry);
+            if(classificationDeadline is {} deadline&&deadline>s.Time)deferred[entry.Id]=deadline;
+        }
         states[s.CharacterId] = s;
         commits.AddRange(Flush(s.Time));
         return commits;
@@ -39,10 +44,12 @@ public sealed class LedgerEngine
         var result = Flush(now, true); active = null; evidence.Clear(); evidenceIds.Clear(); return result;
     }
     public IReadOnlyList<Commit> Flush(DateTimeOffset now, bool force = false) {
-        var expired = evidence.Where(e => now - e.Time > TimeSpan.FromSeconds(10)).ToList();
+        var expired = evidence.Where(e => now - e.Time > TimeSpan.FromSeconds(10)&&!pending.Any(p=>p.CharacterId==e.CharacterId&&p.Amount==e.Amount&&(p.Time-e.Time).Duration()<=CorrelationWindow)).ToList();
         foreach (var e in expired) { evidence.Remove(e); evidenceIds.Remove(e.Id); }
         if (evidenceIds.Count > 4096) evidenceIds.Clear();
-        var ready = pending.Where(x => force || now - x.Time >= CorrelationWindow).ToList();
+        // Commit a contiguous prefix only: a held teleport debit must not be skipped by later checkpoints.
+        var ready = pending.GroupBy(e=>e.CharacterId).SelectMany(g=>g.TakeWhile(x => force ||
+            now-x.Time>=CorrelationWindow&&(!deferred.TryGetValue(x.Id,out var deadline)||now>=deadline))).ToList();
         if (ready.Count == 0) return [];
         var result = new List<Commit>();
         foreach (var group in ready.GroupBy(x => x.CharacterId)) {
@@ -66,7 +73,7 @@ public sealed class LedgerEngine
             var state = states[group.Key] with { Balance = last.After, Time = last.Time };
             result.Add(new(state, entries));
         }
-        foreach (var entry in ready) pending.Remove(entry);
+        foreach (var entry in ready) {pending.Remove(entry);deferred.Remove(entry.Id);}
         return result;
     }
     private static LedgerEntry New(BalanceSample s, long before) => new(Guid.NewGuid().ToString("N"), s.CharacterId, s.CharacterName, s.Time, before, s.Balance, s.Location);

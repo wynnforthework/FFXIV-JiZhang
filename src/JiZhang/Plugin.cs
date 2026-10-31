@@ -33,6 +33,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
     private LedgerEngine? engine;
     private readonly Task<BalanceSample[]> initial;
     private readonly ConcurrentQueue<Evidence> incoming = new();
+    private readonly SystemMessageCorrelator systemMessages=new();
     private readonly List<Task> saves = [];
     private readonly LedgerWindow window;
     private readonly LedgerFonts fonts;
@@ -88,7 +89,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
             // Zoning may temporarily unload player state; an in-flight request keeps its baseline.
             if(Client.IsLoggedIn&&teleport.Pending&&(!Player.IsLoaded||Player.ContentId==0))return;
             if (!Client.IsLoggedIn || !Player.IsLoaded || Player.ContentId == 0) {
-                Save(engine.Suspend(DateTimeOffset.UtcNow)); Current = null; activeCharacter = 0; teleport.Reset(); Status = "等待角色登录"; return;
+                Save(engine.Suspend(DateTimeOffset.UtcNow)); Current = null; activeCharacter = 0; teleport.Reset(); systemMessages.Reset(); Status = "等待角色登录"; return;
             }
             var manager = InventoryManager.Instance();
             if (manager == null) { if(!teleport.Pending)Save(engine.Suspend(DateTimeOffset.UtcNow)); return; }
@@ -110,7 +111,6 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
             var teleportEvidence=teleport.Observe(sample with {Location=location},delta);
             if(teleportEvidence!=null)engine.AddEvidence(teleportEvidence);
             if((delta<0&&departure!=null&&teleport.Pending)||teleportEvidence!=null)sample=sample with {Location=departure??sample.Location};
-            Save(engine.Observe(sample)); Current = sample;
             while (incoming.TryDequeue(out var e)) {
                 if (e.ItemId.HasValue) {
                     var item = Data.GetExcelSheet<Item>().GetRowOrDefault(e.ItemId.Value % 1000000);
@@ -118,6 +118,8 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
                 }
                 engine.AddEvidence(e);
             }
+            if(!teleport.Pending)engine.ReleaseDeferred();
+            Save(engine.Observe(sample,teleport.Pending?teleport.Deadline:null)); Current=sample;
             if (old != null && old.CharacterId == sample.CharacterId && old.Balance != sample.Balance && Config.EnableExperimentalClassification)
                 AddContextEvidence(sample, sample.Balance - old.Balance);
             if (read is { IsCompleted: true }) { var loaded = read.GetAwaiter().GetResult(); if (readCharacter == activeCharacter) Entries = loaded; read = null; }
@@ -153,9 +155,11 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
         var type = (XivChatType)message.LogKind;
         var timestamp = message.Timestamp;
         // Never interpret player-authored chat as financial evidence or retainer sale notices as wallet income.
-        if (type is not (XivChatType.SystemMessage or XivChatType.LootNotice or XivChatType.GatheringSystemMessage)) return;
+        if (type is not (XivChatType.SystemMessage or XivChatType.LootNotice or XivChatType.GatheringSystemMessage or XivChatType.Progress or XivChatType.Notice or XivChatType.Urgent)) return;
         var cid = activeCharacter; if (cid == 0) return;
-        var e = SystemMessageParser.Parse(cid, DateTimeOffset.UtcNow, message.Message.TextValue, $"chat:{cid}:{timestamp}:{(int)type}:{message.Message.TextValue}");
+        var text=message.OriginalMessage.ExtractText();
+        var e = systemMessages.Process(cid, DateTimeOffset.UtcNow, text, $"chat:{cid}:{timestamp}:{(int)type}:{text}");
+        if(text.Contains("金币"))Log.Debug("金币系统消息：频道 {Channel}，解析分类 {Category}",(int)type,e?.Category.ToString()??"无匹配");
         if (e != null) incoming.Enqueue(e);
     }
     private void OnMarketRequest(IMarketBoardPurchaseHandler p) {
@@ -173,7 +177,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
     private void RestoreCore(string path) {
         if (restoring || engine == null) return;
         Save(engine.Suspend(DateTimeOffset.UtcNow));
-        restoring = true; activeCharacter = 0; Current = null; teleport.Reset();
+        restoring = true; activeCharacter = 0; Current = null; teleport.Reset(); systemMessages.Reset();
         while (incoming.TryDequeue(out _)) { }
         lock (marketLock) request = null;
         restoreTask = Store.RestoreAsync(path);
@@ -192,7 +196,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
     void ILedgerUiContext.Restore(string path) => Restore(path);
     public void Dispose() {
         disposed = true;
-        teleportHook?.Dispose(); teleport.Reset();
+        ticketTeleportHook?.Dispose(); teleportHook?.Dispose(); teleport.Reset(); systemMessages.Reset();
         Framework.Update -= Update; Chat.ChatMessage -= OnChat;
         Market.PurchaseRequested -= OnMarketRequest; Market.ItemPurchased -= OnMarketPurchase;
         Interface.UiBuilder.Draw -= Draw; Interface.UiBuilder.OpenMainUi -= Open; Interface.UiBuilder.OpenConfigUi -= Open;

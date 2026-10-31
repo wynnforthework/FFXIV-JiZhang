@@ -1,12 +1,12 @@
 namespace JiZhang.Core;
 
-public enum Category { Unknown, Teleport, NpcPurchase, NpcSale, MarketPurchase, Repair, QuestReward, SystemReward, PlayerTrade, RetainerTransfer, FreeCompanyTransfer, Gap }
+public enum Category { Unknown, Teleport, NpcPurchase, NpcSale, MarketPurchase, Repair, QuestReward, SystemReward, PlayerTrade, RetainerTransfer, FreeCompanyTransfer, Gap, ChallengeReward }
 public static class Categories
 {
     public static string Label(this Category c) => c switch {
         Category.Teleport => "传送", Category.NpcPurchase => "NPC 购物", Category.NpcSale => "NPC 售卖",
         Category.MarketPurchase => "市场购买", Category.Repair => "修理", Category.QuestReward => "任务奖励",
-        Category.SystemReward => "系统奖励", Category.PlayerTrade => "玩家交易", Category.RetainerTransfer => "雇员转账",
+        Category.SystemReward => "系统奖励", Category.ChallengeReward => "挑战笔记奖励", Category.PlayerTrade => "玩家交易", Category.RetainerTransfer => "雇员转账",
         Category.FreeCompanyTransfer => "部队转账", Category.Gap => "记录中断期间差额", _ => "未分类" };
     public static bool IsTransfer(this Category c) => c is Category.RetainerTransfer or Category.FreeCompanyTransfer;
 }

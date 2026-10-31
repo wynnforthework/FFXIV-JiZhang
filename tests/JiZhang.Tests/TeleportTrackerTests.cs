@@ -11,14 +11,36 @@ public class TeleportTrackerTests
     [Fact] public void SimultaneousArrivalAndDebitMatches() {Assert.NotNull(Request().Observe(Sample(4),-100));}
     [Fact] public void CancelledExpiredFreeMismatchedOrOtherCharacterStayUnknown() {
         Assert.Null(Request().Observe(Sample(2,territory:1),0));
-        Assert.Null(Request().Observe(Sample(31),-100));
+        Assert.Null(Request().Observe(Sample(91),-100));
         Assert.Null(Request(0).Observe(Sample(2),-100));
         Assert.Null(Request().Observe(Sample(2),-101));
         Assert.Null(Request().Observe(Sample(2,character:2),-100));
         Assert.Null(Request(100,1).Observe(Sample(2,territory:1),-100));
-        var late=Request();late.Observe(Sample(2,territory:1),-100);Assert.Null(late.Observe(Sample(5),0));
+        var late=Request();late.Observe(Sample(2,territory:1),-100);Assert.Null(late.Observe(Sample(95),0));
         var reset=Request();reset.Reset();Assert.Null(reset.Observe(Sample(2),-100));
-        var expired=Request();expired.Expire(now.AddSeconds(31));Assert.False(expired.Pending);
+        var expired=Request();expired.Expire(now.AddSeconds(91));Assert.False(expired.Pending);
+    }
+    [Fact] public void SlowLoadingKeepsDebitUntilArrivalAndDoesNotAdvanceCheckpointPastIt() {
+        var engine=new LedgerEngine();engine.Observe(Sample(0,1000,1));var tracker=Request();
+        var debit=Sample(4,900,1);Assert.Null(tracker.Observe(debit,-100));engine.Observe(debit,tracker.Deadline);
+        Assert.Empty(engine.Observe(Sample(8,900,1))); // Beyond the ordinary two-second window.
+        var proof=tracker.Observe(Sample(24,900,2),0);Assert.NotNull(proof);engine.AddEvidence(proof);
+        engine.ReleaseDeferred();var commits=engine.Observe(Sample(24,900,2));
+        var entry=Assert.Single(commits.SelectMany(c=>c.Entries));Assert.Equal(Category.Teleport,entry.Category);
+        Assert.Equal(now.AddSeconds(4),entry.Time);Assert.Equal(900,commits.Last().State.Balance);
+    }
+    [Fact] public void DeferredPrefixKeepsLaterChangesAndEvidenceInOrder() {
+        var engine=new LedgerEngine();engine.Observe(Sample(0,1000,1));engine.Observe(Sample(4,900,1),now.AddSeconds(90));
+        engine.AddEvidence(new("reward",1,now.AddSeconds(5),1000,Category.SystemReward,"","system"));
+        engine.Observe(Sample(5,1900,1));Assert.Empty(engine.Flush(now.AddSeconds(30)));
+        engine.ReleaseDeferred();var commits=engine.Flush(now.AddSeconds(31));var entries=commits.SelectMany(c=>c.Entries).ToArray();
+        Assert.Equal(2,entries.Length);Assert.Equal(Category.Unknown,entries[0].Category);Assert.Equal(Category.SystemReward,entries[1].Category);
+        Assert.Equal(1900,1000+entries.Sum(e=>e.Amount));Assert.Equal(1900,commits.Last().State.Balance);
+    }
+    [Fact] public void TimedOutDebitEventuallyCommitsUnknownAndSuspendFlushesHeldEntries() {
+        var engine=new LedgerEngine();engine.Observe(Sample(0,1000,1));engine.Observe(Sample(4,900,1),now.AddSeconds(90));
+        Assert.Empty(engine.Flush(now.AddSeconds(89)));Assert.Equal(Category.Unknown,Assert.Single(engine.Flush(now.AddSeconds(91)).SelectMany(c=>c.Entries)).Category);
+        engine.Observe(Sample(92,800,1),now.AddSeconds(180));Assert.Single(engine.Suspend(now.AddSeconds(93)).SelectMany(c=>c.Entries));
     }
     [Fact] public void ConflictingDestinationsRemainUnknown() {
         var engine=new LedgerEngine();engine.Observe(Sample(0,1000,1));var sample=Sample(4);
