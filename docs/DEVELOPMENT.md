@@ -20,7 +20,7 @@ dotnet run --project tools/JiZhang.Preview -- artifacts/ui-preview
 python scripts/render-preview.py artifacts/ui-preview marketing-overview transactions settings
 ```
 
-渲染脚本依赖 Pillow 与 numpy。README 高清截图保存在 `images/screenshots/`。插件管理器用等比缩小到730×380以内的 `images/image1.png`、`image2.png`、`image3.png`；开发插件直接读取 DLL 旁的这些文件，第三方插件清单的 `ImageUrls` 也指向对应小图。构建和 ZIP 必须包含这些文件，打包时校验尺寸。卫月会缓存已加载或加载失败的图片；替换后如未刷新，需重新打开插件管理器或重启游戏清掉图片缓存。替换时需检查标题、按钮、中文字体及滚动裁切。
+渲染脚本依赖 Pillow 与 numpy。README 高清截图保存在 `images/screenshots/`。插件管理器用等比缩小到730×380以内的 `images/image1.png`、`image2.png`、`image3.png`；开发插件直接读取 DLL 旁的这些文件，第三方插件清单的 `ImageUrls` 也指向对应小图。构建和 ZIP 必须包含这些文件，打包时校验尺寸。卫月会缓存已加载或加载失败的图片；本机日志已确认旧大图被拒绝后留下失败缓存。源码的 OnOpen 只刷新仓库和扫描开发插件，不调用 ClearIconCache，因此关闭再打开安装器、禁用再启用插件都不保证刷新图片；重启游戏后缓存才会重新建立。替换时需检查标题、按钮、中文字体及滚动裁切。
 
 动效输入验证：
 
@@ -40,3 +40,10 @@ dotnet run --project tools/JiZhang.Preview -- artifacts/ui-motion --motion
 - `JiZhang`：Dalamud 服务适配、命令和 ImGui 界面。
 - `tests`：不依赖游戏的核心测试。
 - `scripts`：引用程序集下载、构建、截图渲染及打包。
+
+
+### AutoDuty 对照与本机排查
+
+AutoDuty 的 `AutoDuty/AutoDuty.json` 使用标准 `ImageUrls` 数组指向图片服务，并未通过插件代码向安装器注入截图。金币账本采用同一清单机制，另为开发插件提供 `images/image1.png` 至 `image3.png`。
+
+本机当前启用的开发插件路径为 `artifacts/JiZhang/JiZhang.dll`；排查时必须检查该路径旁的清单和图片，不能只检查 `bin/Release`。本轮已核实当前目录中的三张图片符合尺寸限制、与清单远程 URL 的内容一致且远程可访问。日志中08:18的旧图错误分别为1040×1000、1040×780、1040×960；之后重载插件没有触发图片重新加载。故不能把文件修复后直接视作安装器画面已验证，需重启后在安装器展开金币账本条目检查。
