@@ -1,1 +1,36 @@
-[]
+[
+  {
+    "Author": "wynnforthework",
+    "Name": "小肥记账",
+    "InternalName": "JiZhang",
+    "AssemblyVersion": "0.1.1.0",
+    "Description": "自动记录当前角色的金币收入与支出，查看交易时间、地点、用途及余额变化。提供当月、当年和全部历史的收支趋势与支出去向，支持流水筛选、分类详情、CSV 导出、账本备份及按角色独立保存。",
+    "ApplicableVersion": "any",
+    "RepoUrl": "https://github.com/wynnforthework/FFXIV-JiZhang",
+    "Tags": [
+      "gil",
+      "ledger",
+      "金币",
+      "记账"
+    ],
+    "DalamudApiLevel": 15,
+    "LoadRequiredState": 0,
+    "LoadSync": false,
+    "CanUnloadAsync": false,
+    "LoadPriority": 0,
+    "ImageUrls": [
+      "https://raw.githubusercontent.com/wynnforthework/FFXIV-JiZhang/main/images/image1.png",
+      "https://raw.githubusercontent.com/wynnforthework/FFXIV-JiZhang/main/images/image2.png",
+      "https://raw.githubusercontent.com/wynnforthework/FFXIV-JiZhang/main/images/image3.png"
+    ],
+    "IconUrl": "https://raw.githubusercontent.com/wynnforthework/FFXIV-JiZhang/main/images/icon.png",
+    "Punchline": "金币流向，一目了然",
+    "AcceptsFeedback": true,
+    "IsHide": false,
+    "IsTestingExclusive": false,
+    "DownloadLinkInstall": "https://github.com/wynnforthework/FFXIV-JiZhang/releases/download/v0.1.1.0/JiZhang.zip",
+    "DownloadLinkUpdate": "https://github.com/wynnforthework/FFXIV-JiZhang/releases/download/v0.1.1.0/JiZhang.zip",
+    "DownloadLinkTesting": "https://github.com/wynnforthework/FFXIV-JiZhang/releases/download/v0.1.1.0/JiZhang.zip",
+    "LastUpdate": 1793408448
+  }
+]
