@@ -43,7 +43,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          gh release create $env:GITHUB_REF_NAME artifacts/JiZhang.zip artifacts/SHA256SUMS --title "小肥记账 $env:GITHUB_REF_NAME" --generate-notes
+          gh release create $env:GITHUB_REF_NAME artifacts/JiZhang.zip artifacts/SHA256SUMS --title "小肥记账 $env:GITHUB_REF_NAME" --prerelease --notes-file RELEASE_NOTES.md
           if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }
       - name: Update plugin subscription
         shell: pwsh

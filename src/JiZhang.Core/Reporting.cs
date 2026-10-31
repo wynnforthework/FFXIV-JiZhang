@@ -24,21 +24,40 @@ public sealed record LedgerReport(ReportBucket[] Buckets, (Category Category,lon
 public readonly record struct TreeCell(int Index, double X, double Y, double Width, double Height);
 public static class Treemap
 {
-    // Balanced binary area partition: no hidden minimum area and no unaccounted category.
+    // Squarified treemap: grow each strip only while its worst aspect ratio improves.
     public static TreeCell[] Layout(IReadOnlyList<long> amounts, double width, double height) {
-        if(width<=0||height<=0||amounts.Any(x=>x<=0))return [];
-        var result=new List<TreeCell>();
-        void Split(int first,int count,double x,double y,double w,double h) {
-            if(count==0)return;
-            if(count==1){result.Add(new(first,x,y,w,h));return;}
-            var total=amounts.Skip(first).Take(count).Sum(v=>(double)v);double sum=0;var cut=1;
-            for(var i=1;i<count;i++){sum+=amounts[first+i-1];cut=i;if(sum>=total/2)break;}
-            // Choose the closer split, while keeping both groups nonempty.
-            if(cut>1&&Math.Abs(sum-amounts[first+cut-1]-total/2)<Math.Abs(sum-total/2)){sum-=amounts[first+--cut];}
-            var ratio=sum/total;
-            if(w>=h){Split(first,cut,x,y,w*ratio,h);Split(first+cut,count-cut,x+w*ratio,y,w*(1-ratio),h);}
-            else {Split(first,cut,x,y,w,h*ratio);Split(first+cut,count-cut,x,y+h*ratio,w,h*(1-ratio));}
+        if(width<=0||height<=0||!double.IsFinite(width)||!double.IsFinite(height)||amounts.Any(x=>x<=0))return [];
+        var total=amounts.Sum(v=>(double)v);
+        if(total==0)return [];
+        var items=amounts.Select((v,i)=>(Index:i,Area:(double)v/total*width*height)).OrderByDescending(x=>x.Area).ToArray();
+        var result=new List<TreeCell>();double x=0,y=0,w=width,h=height;
+        double Worst(int start,int count,double side) {
+            var sum=items.Skip(start).Take(count).Sum(v=>v.Area);
+            var max=items[start].Area;var min=items[start+count-1].Area;
+            return Math.Max(side*side*max/(sum*sum),sum*sum/(side*side*min));
         }
-        Split(0,amounts.Count,0,0,width,height);return result.ToArray();
+        for(var first=0;first<items.Length;) {
+            var side=Math.Min(w,h);var count=1;
+            while(first+count<items.Length&&Worst(first,count+1,side)<=Worst(first,count,side))count++;
+            var area=items.Skip(first).Take(count).Sum(v=>v.Area);
+            var last=first+count==items.Length;
+            if(w>=h) {
+                var strip=last?w:area/h;double cy=y;
+                for(var i=0;i<count;i++) {
+                    var item=items[first+i];var length=i==count-1?y+h-cy:item.Area/strip;
+                    result.Add(new(item.Index,x,cy,strip,length));cy+=length;
+                }
+                x+=strip;w=Math.Max(0,w-strip);
+            }else {
+                var strip=last?h:area/w;double cx=x;
+                for(var i=0;i<count;i++) {
+                    var item=items[first+i];var length=i==count-1?x+w-cx:item.Area/strip;
+                    result.Add(new(item.Index,cx,y,length,strip));cx+=length;
+                }
+                y+=strip;h=Math.Max(0,h-strip);
+            }
+            first+=count;
+        }
+        return result.ToArray();
     }
 }

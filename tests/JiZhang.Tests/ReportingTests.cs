@@ -26,4 +26,19 @@ public class ReportingTests
             foreach(var d in cells.Where(d=>d.Index!=c.Index))Assert.True(Math.Min(c.X+c.Width,d.X+d.Width)-Math.Max(c.X,d.X)<.0001||Math.Min(c.Y+c.Height,d.Y+d.Height)-Math.Max(c.Y,d.Y)<.0001);
         }
     }
+    [Fact] public void EqualCategoriesFormCompactTilesAndRetainInputIdentity() {
+        var cells=Treemap.Layout([1,1,1,1],200,200);Assert.Equal(4,cells.Length);
+        Assert.All(cells,c=>{Assert.Equal(100,c.Width,6);Assert.Equal(100,c.Height,6);});
+        long[] amounts=[1,9,3,7,2];var mixed=Treemap.Layout(amounts,360,220);
+        foreach(var cell in mixed)Assert.Equal((double)amounts[cell.Index]/amounts.Sum(),cell.Width*cell.Height/(360*220),8);
+        Assert.Empty(Treemap.Layout([],200,200));Assert.Empty(Treemap.Layout([0,1],200,200));
+    }
+    [Fact] public void SingleCategoryFillsChartAndInvalidDimensionsAreRejected() {
+        Assert.Equal(new TreeCell(0,0,0,320,205),Assert.Single(Treemap.Layout([750],320,205)));
+        Assert.Empty(Treemap.Layout([1],0,205));
+        Assert.Empty(Treemap.Layout([1],320,-1));
+        Assert.Empty(Treemap.Layout([1],double.NaN,205));
+        Assert.Empty(Treemap.Layout([1],320,double.PositiveInfinity));
+        Assert.Empty(Treemap.Layout([-1,2],320,205));
+    }
 }

@@ -294,28 +294,44 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         ImGui.Dummy(new(1,Math.Max(0,height-112)*Unit));
     }
     private void DrawCategories() {
-        Vector4[] colors=[Accent,new(.36f,.49f,.39f,1),Gold,new(.34f,.43f,.44f,1),new(.47f,.39f,.29f,1)];
-        var origin=ImGui.GetCursorScreenPos();var size=new Vector2(ImGui.GetContentRegionAvail().X,185*Unit);
+        // Colors belong to categories rather than their rank: changing periods does not recolor them.
+        Vector4 CategoryColor(Category c)=>c switch {
+            Category.Teleport=>new(.48f,.78f,.74f,1),Category.MarketPurchase=>new(.97f,.72f,.42f,1),
+            Category.NpcPurchase=>new(.95f,.58f,.51f,1),Category.Repair=>new(.43f,.67f,.87f,1),
+            Category.PlayerTrade=>new(.68f,.62f,.83f,1),Category.RetainerTransfer=>new(.53f,.77f,.57f,1),
+            Category.FreeCompanyTransfer=>new(.83f,.69f,.47f,1),_=>new(.66f,.71f,.73f,1)
+        };
+        var origin=ImGui.GetCursorScreenPos();var size=new Vector2(ImGui.GetContentRegionAvail().X,205*Unit);
         var total=groups.Sum(g=>g.Amount);var draw=ImGui.GetWindowDrawList();
-        foreach(var cell in Treemap.Layout(groups.Select(g=>g.Amount).ToArray(),size.X,size.Y)) {
+        var cells=Treemap.Layout(groups.Select(g=>g.Amount).ToArray(),size.X,size.Y);
+        var mouse=ImGui.GetMousePos()-origin;
+        var hovered=ImGui.IsMouseHoveringRect(origin,origin+size);
+        TreeCell? hit=null;
+        foreach(var cell in cells) {
             var p=origin+new Vector2((float)cell.X,(float)cell.Y);var end=p+new Vector2((float)cell.Width,(float)cell.Height);
-            var g=groups[cell.Index];var fill=colors[cell.Index%colors.Length];
-            draw.AddRectFilled(p,end,Color(fill),2*Unit);
-            draw.AddRect(p,end,Color(Surface),0,ImDrawFlags.None,2*Unit);
-            draw.PushClipRect(p+new Vector2(5*Unit),end-new Vector2(5*Unit),true);
-            var label=g.Category.Label();
-            if(cell.Width>ImGui.CalcTextSize(label).X+16*Unit&&cell.Height>28*Unit)draw.AddText(p+new Vector2(10,10)*Unit,Color(new(1,1,.97f,1)),label);
-            if(cell.Width>90*Unit&&cell.Height>70*Unit){draw.AddText(p+new Vector2(10,36)*Unit,Color(new(1,1,.97f,1)),Money(g.Amount));draw.AddText(p+new Vector2(10,60)*Unit,Color(new(1,1,.97f,.8f)),((double)g.Amount/total).ToString("P1"));}
+            var g=groups[cell.Index];var fill=CategoryColor(g.Category);
+            var active=hovered&&mouse.X>=cell.X&&mouse.X<cell.X+cell.Width&&mouse.Y>=cell.Y&&mouse.Y<cell.Y+cell.Height;
+            if(active){hit=cell;fill=Vector4.Lerp(fill,Vector4.One,.12f);}
+            draw.AddRectFilled(p,end,Color(fill));
+            draw.AddRect(p,end,Color(Surface),0,ImDrawFlags.None,Unit);
+            if(cell.Width<=12*Unit||cell.Height<=12*Unit)continue;
+            var label=g.Category.Label();var width=(float)cell.Width-16*Unit;
+            while(label.Length>1&&ImGui.CalcTextSize(label).X>width)label=label[..^2]+"…";
+            var lines=new List<string>();
+            if(ImGui.CalcTextSize(label).X<=width&&cell.Height>30*Unit)lines.Add(label);
+            var amount=Money(g.Amount)+" GIL";var percent=((double)g.Amount/total).ToString("P1");
+            if(lines.Count>0&&cell.Height>58*Unit&&ImGui.CalcTextSize(amount).X<=width)lines.Add(amount);
+            if(lines.Count>1&&cell.Height>84*Unit&&ImGui.CalcTextSize(percent).X<=width)lines.Add(percent);
+            var lineHeight=22*Unit;var top=(p.Y+end.Y-lines.Count*lineHeight)/2;
+            draw.PushClipRect(p+new Vector2(4*Unit),end-new Vector2(4*Unit),true);
+            for(var i=0;i<lines.Count;i++)draw.AddText(new((p.X+end.X-ImGui.CalcTextSize(lines[i]).X)/2,top+i*lineHeight),Color(Ink),lines[i]);
             draw.PopClipRect();
         }
         ImGui.InvisibleButton("spending-treemap",size);
-        if(ImGui.IsItemHovered()) {
-            var mouse=ImGui.GetMousePos()-origin;
-            foreach(var c in Treemap.Layout(groups.Select(g=>g.Amount).ToArray(),size.X,size.Y))if(mouse.X>=c.X&&mouse.X<c.X+c.Width&&mouse.Y>=c.Y&&mouse.Y<c.Y+c.Height) {
-                var g=groups[c.Index];Tooltip($"{g.Category.Label()}\n支出 {Money(g.Amount)} GIL · {(double)g.Amount/total:P1}");break;
-            }
+        if(ImGui.IsItemHovered()&&hit is {} c) {
+            var g=groups[c.Index];Tooltip($"{g.Category.Label()}\n支出 {Money(g.Amount)} GIL · {(double)g.Amount/total:P1}");
         }
-        ImGui.TextColored(Muted,"矩形面积代表金额 · 悬停查看明细");
+        ImGui.TextColored(Muted,"面积代表支出金额 · 悬停查看明细");
     }
     private void DrawTrend() {
         var income=trend.Max(t=>t.Income);var expense=trend.Max(t=>t.Expense);
