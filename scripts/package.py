@@ -1,11 +1,17 @@
 """Package only plugin dependencies; never redistribute Dalamud or game assemblies."""
-import hashlib,json,zipfile
+import hashlib,json,zipfile,struct
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 out=ROOT/'src/JiZhang/bin/Release'
 artifacts=ROOT/'artifacts';artifacts.mkdir(exist_ok=True)
 manifest=json.loads((out/'JiZhang.json').read_text(encoding='utf-8'))
-files=['JiZhang.dll','JiZhang.Core.dll','JiZhang.json','JiZhang.deps.json','images/icon.png','Microsoft.Data.Sqlite.dll','SQLitePCLRaw.batteries_v2.dll','SQLitePCLRaw.core.dll','SQLitePCLRaw.provider.e_sqlite3.dll','runtimes/win-x64/native/e_sqlite3.dll']
+files=['JiZhang.dll','JiZhang.Core.dll','JiZhang.json','JiZhang.deps.json','images/icon.png','images/image1.png','images/image2.png','images/image3.png','Microsoft.Data.Sqlite.dll','SQLitePCLRaw.batteries_v2.dll','SQLitePCLRaw.core.dll','SQLitePCLRaw.provider.e_sqlite3.dll','runtimes/win-x64/native/e_sqlite3.dll']
+# Dalamud rejects introduction images exceeding 730x380; dev plugins use these exact local names.
+for name in ['images/image1.png','images/image2.png','images/image3.png']:
+ data=(out/name).read_bytes()
+ assert data[:8]==b'\x89PNG\r\n\x1a\n', f'{name} must be PNG'
+ width,height=struct.unpack('>II',data[16:24])
+ assert 0<width<=730 and 0<height<=380, f'{name}: {width}x{height} exceeds Dalamud image limits'
 archive=artifacts/'JiZhang.zip'
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
  for name in files:

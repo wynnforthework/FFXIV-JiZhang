@@ -20,7 +20,7 @@ dotnet run --project tools/JiZhang.Preview -- artifacts/ui-preview
 python scripts/render-preview.py artifacts/ui-preview marketing-overview transactions settings
 ```
 
-渲染脚本依赖 Pillow 与 numpy。介绍截图保存在 `images/screenshots/`；插件清单的 `ImageUrls` 指向同一组图片。替换时需检查标题、按钮、中文字体及滚动裁切。
+渲染脚本依赖 Pillow 与 numpy。README 高清截图保存在 `images/screenshots/`。插件管理器用等比缩小到730×380以内的 `images/image1.png`、`image2.png`、`image3.png`；开发插件直接读取 DLL 旁的这些文件，第三方插件清单的 `ImageUrls` 也指向对应小图。构建和 ZIP 必须包含这些文件，打包时校验尺寸。卫月会缓存已加载或加载失败的图片；替换后如未刷新，需重新打开插件管理器或重启游戏清掉图片缓存。替换时需检查标题、按钮、中文字体及滚动裁切。
 
 动效输入验证：
 
