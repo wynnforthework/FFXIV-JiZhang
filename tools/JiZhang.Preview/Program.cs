@@ -7,7 +7,7 @@ using JiZhang.Core;
 unsafe {
     var root=Path.GetFullPath(args.FirstOrDefault()??"artifacts/ui-preview");Directory.CreateDirectory(root);
     ImGui.CreateContext();var io=ImGui.GetIO();io.IniFilename=null;io.LogFilename=null;io.DeltaTime=1f/60;
-    var glyphText=string.Join("",Directory.GetFiles("src","*.cs",SearchOption.AllDirectories).Where(p=>!p.Contains("obj")).Select(File.ReadAllText))+"示例角色利姆萨罗敏萨本地账本目录离线预览";
+    var glyphText=string.Join("",Directory.GetFiles("src","*.cs",SearchOption.AllDirectories).Where(p=>!p.Contains("obj")).Select(File.ReadAllText))+File.ReadAllText("tools/JiZhang.Preview/Program.cs")+"示例角色利姆萨罗敏萨本地账本目录离线预览";
     var ranges=Enumerable.Range(32,95).Select(i=>(char)i).Concat(glyphText.Where(c=>c>=127)).Distinct().Order().SelectMany(c=>new[]{(ushort)c,(ushort)c}).Append((ushort)0).ToArray();
     var rangeHandle=GCHandle.Alloc(ranges,GCHandleType.Pinned);
     foreach(var scale in new[]{1f,1.6f})
@@ -118,7 +118,7 @@ namespace JiZhang {
                     "huge-expense"=>i%3==0?580+i*80:-12000000-i*110,
                     _=>i%3==0?2800+i*110:-1580-i*80
                 };
-                list.Add(new(i.ToString(),1,"示例角色",DateTimeOffset.Now.AddDays(-i),balance-amount,balance,new(128,"利姆萨·罗敏萨"),amount>0?Category.QuestReward:scenario=="mixed-categories"?new[]{Category.Teleport,Category.Repair,Category.NpcPurchase,Category.MarketPurchase,Category.PlayerTrade,Category.RetainerTransfer}[i%6]:i%2==0?Category.MarketPurchase:Category.Teleport));
+                list.Add(new(i.ToString(),1,"示例角色",DateTimeOffset.Now.AddDays(-i),balance-amount,balance,new(128,"利姆萨·罗敏萨"),amount>0?Category.QuestReward:scenario=="mixed-categories"?new[]{Category.Teleport,Category.Repair,Category.NpcPurchase,Category.MarketPurchase,Category.PlayerTrade,Category.RetainerTransfer}[i%6]:i%2==0?Category.MarketPurchase:Category.Teleport,Destination:amount<0&&i%2!=0&&scenario!="mixed-categories"?"格里达尼亚 · 新街":null));
             }Entries=list.ToArray();
         }
         public void SaveConfig(){}public Task<string> ExportAsync()=>Task.FromResult("预览");public Task<string> BackupAsync()=>Task.FromResult("预览");public Task<string> ReclassifyAsync()=>Task.FromResult("预览");public void Restore(string path){}

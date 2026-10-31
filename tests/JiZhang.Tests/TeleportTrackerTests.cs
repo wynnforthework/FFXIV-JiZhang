@@ -51,6 +51,6 @@ public class TeleportTrackerTests
     [Fact] public void EvidenceAndWalletProduceOneEntry() {
         var engine=new LedgerEngine();engine.Observe(Sample(0,1000,1));var t=Request();var sample=Sample(4);
         engine.AddEvidence(t.Observe(sample,-100)!);engine.AddEvidence(new("chat",1,sample.Time,-100,Category.Teleport,"传送消耗100金币","系统消息"));engine.Observe(sample);
-        var entries=engine.Flush(now.AddSeconds(7)).SelectMany(c=>c.Entries).ToArray();Assert.Single(entries);Assert.Equal(Category.Teleport,entries[0].Category);Assert.Equal(900,entries[0].After);
+        var entries=engine.Flush(now.AddSeconds(7)).SelectMany(c=>c.Entries).ToArray();Assert.Single(entries);Assert.Equal(Category.Teleport,entries[0].Category);Assert.Equal(900,entries[0].After);Assert.Equal("目的地",entries[0].Destination);
     }
 }

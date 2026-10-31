@@ -30,8 +30,11 @@ public sealed partial class Plugin
             foreach(var info in self->TeleportList) {
                 if(info.AetheryteId!=id||info.SubIndex!=subIndex)continue;
                 var row=Data.GetExcelSheet<Aetheryte>().GetRowOrDefault(id);
-                return new(current.CharacterId,DateTimeOffset.UtcNow,info.TerritoryId,info.GilCost,
-                    row?.PlaceName.Value.Name.ToString()??$"以太之光 #{id}",ReadLocation());
+                var destination=row?.PlaceName.Value.Name.ToString();
+                var region=Data.GetExcelSheet<TerritoryType>().GetRowOrDefault(info.TerritoryId)?.PlaceName.Value.Name.ToString();
+                if(string.IsNullOrWhiteSpace(destination))destination=string.IsNullOrWhiteSpace(region)?$"以太之光 #{id}":region;
+                else if(!string.IsNullOrWhiteSpace(region)&&region!=destination)destination=region+" · "+destination;
+                return new(current.CharacterId,DateTimeOffset.UtcNow,info.TerritoryId,info.GilCost,destination,ReadLocation());
             }
             Log.Debug("传送请求未找到费用快照：以太之光 {Id} / 子区域 {SubIndex}",id,subIndex);
         }catch(Exception e){Log.Warning(e,"传送请求证据读取失败");}

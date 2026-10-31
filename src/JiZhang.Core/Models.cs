@@ -21,6 +21,10 @@ public sealed record LedgerEntry(string Id, ulong CharacterId, string CharacterN
 {
     public long Amount => After - Before;
     public bool IsGap => Category == Category.Gap;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string PlaceLabel=>Category==Category.Teleport
+        ?$"{Location.Name} → {(string.IsNullOrWhiteSpace(Destination)?"终点未知":Destination)}"
+        :Location.Name;
 }
 public sealed record Commit(BalanceSample State, IReadOnlyList<LedgerEntry> Entries);
 public sealed record Totals(long Income, long Expense)

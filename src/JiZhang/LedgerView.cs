@@ -257,7 +257,13 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
                 draw.AddCircleFilled(row+new Vector2(11,13)*Unit,11*Unit,Color((e.Amount>0?Green:Red) with {W=.10f}));
                 draw.AddText(row+new Vector2(6,4)*Unit,Color(e.Amount>0?Green:Red),e.Amount>0?"+":"-");
                 draw.AddText(row+new Vector2(34,4)*Unit,Color(Ink),e.Category.Label());
-                if(rowWidth>600*Unit)draw.AddText(row+new Vector2(170,4)*Unit,Color(Muted),$"{e.Time.LocalDateTime:MM/dd HH:mm} · {e.Location.Name}");
+                if(rowWidth>600*Unit) {
+                    var amountWidth=ImGui.CalcTextSize(e.Amount.ToString("+#,0;-#,0;0")).X;
+                    var textStart=row+new Vector2(170,4)*Unit;var textEnd=new Vector2(row.X+rowWidth-amountWidth-16*Unit,row.Y+26*Unit);
+                    draw.PushClipRect(textStart,textEnd,true);
+                    draw.AddText(textStart,Color(Muted),$"{e.Time.LocalDateTime:MM/dd HH:mm} · {e.PlaceLabel}");draw.PopClipRect();
+                    if(ImGui.IsMouseHoveringRect(textStart,textEnd))Tooltip(e.PlaceLabel);
+                }
                 var amount=e.Amount.ToString("+#,0;-#,0;0");draw.AddText(new(row.X+rowWidth-ImGui.CalcTextSize(amount).X,row.Y+4*Unit),Color(e.Amount>0?Green:Red),amount);
                 ImGui.Dummy(new(rowWidth,26*Unit));
             }
@@ -359,7 +365,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         if(Panel("filters",new(-1,175*Unit))) {
             if(ImGui.BeginTable("filter-layout",2,ImGuiTableFlags.SizingStretchSame)) {
                 ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);if(ImGui.InputTextWithHint("##keyword","搜索用途、物品或角色",ref keyword,256))page=0;
-                ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);if(ImGui.InputTextWithHint("##place","筛选地点",ref location,128))page=0;
+                ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);if(ImGui.InputTextWithHint("##place","筛选地点、传送起点或终点",ref location,128))page=0;
                 ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);if(ImGui.InputTextWithHint("##from","开始日期 YYYY-MM-DD",ref from,10))page=0;
                 ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);if(ImGui.InputTextWithHint("##to","结束日期 YYYY-MM-DD",ref to,10))page=0;
                 ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);
@@ -378,7 +384,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         if(to.Length>0){if(DateTime.TryParseExact(to,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out var d))end=d;else{ImGui.TextColored(Red,"结束日期格式应为 YYYY-MM-DD");return;}}
         if(start>end){ImGui.TextColored(Red,"开始日期不能晚于结束日期");return;}
         var list=plugin.Entries.Where(e=>(start==null||e.Time.LocalDateTime.Date>=start)&&(end==null||e.Time.LocalDateTime.Date<=end)&&
-            (direction==0||(direction==1?e.Amount>0:e.Amount<0))&&(category==null||e.Category==category)&&e.Location.Name.Contains(location,StringComparison.OrdinalIgnoreCase)&&
+            (direction==0||(direction==1?e.Amount>0:e.Amount<0))&&(category==null||e.Category==category)&&(e.Location.Name.Contains(location,StringComparison.OrdinalIgnoreCase)||(e.Destination?.Contains(location,StringComparison.OrdinalIgnoreCase)??false))&&
             (keyword.Length==0||$"{e.Detail} {e.ItemName} {e.CharacterName} {e.Category.Label()}".Contains(keyword,StringComparison.OrdinalIgnoreCase))).ToArray();
         var totals=Totals.From(list,exclude);
         ImGui.TextColored(Muted,$"{list.Length:N0} 笔    收入 {Money(totals.Income)}    支出 {Money(totals.Expense)}");
@@ -394,16 +400,17 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
                 if(date!=e.Time.LocalDateTime.Date){date=e.Time.LocalDateTime.Date;ImGui.TableNextRow();ImGui.TableNextColumn();ImGui.TextColored(Gold,date.Value.ToString("yyyy-MM-dd"));}
                 ImGui.TableNextRow(0,34*Unit);ImGui.TableNextColumn();
                 if(ImGui.Selectable(e.Time.LocalDateTime.ToString("HH:mm:ss")+"##"+e.Id,selected?.Id==e.Id,ImGuiSelectableFlags.SpanAllColumns))selected=e;
-                ImGui.TableNextColumn();ImGui.TextUnformatted(e.Category.Label());ImGui.TableNextColumn();ImGui.TextUnformatted(e.Location.Name);
+                ImGui.TableNextColumn();ImGui.TextUnformatted(e.Category.Label());ImGui.TableNextColumn();ImGui.TextWrapped(e.PlaceLabel);
                 ImGui.TableNextColumn();ImGui.TextColored(e.IsGap?Muted:e.Amount>0?Green:Red,e.Amount.ToString("+#,0;-#,0;0"));ImGui.TableNextColumn();ImGui.TextUnformatted(Money(e.After));
             }ImGui.EndTable();
         }
         ImGui.BeginDisabled(page==0);if(ImGui.Button("上一页"))page--;ImGui.EndDisabled();ImGui.SameLine();ImGui.TextUnformatted($"{page+1} / {pages}");ImGui.SameLine();ImGui.BeginDisabled(page+1>=pages);if(ImGui.Button("下一页"))page++;ImGui.EndDisabled();
         if(selected is {} s&&plugin.Current?.CharacterId==s.CharacterId) {
             ImGui.Separator();ImGui.TextColored(Gold,"交易详情 · "+s.Category.Label());ImGui.SameLine();if(ImGui.SmallButton("收起"))selected=null;
-            ImGui.TextWrapped($"{s.Time.LocalDateTime:yyyy-MM-dd HH:mm:ss} · {s.Location.Name} · 世界坐标 X {s.Location.X:F1} / Z {s.Location.Y:F1}");
+            ImGui.TextWrapped($"{s.Time.LocalDateTime:yyyy-MM-dd HH:mm:ss} · {s.PlaceLabel}");
+            ImGui.TextWrapped($"{(s.Category==Category.Teleport?"起点":"地点")}世界坐标 X {s.Location.X:F1} / Z {s.Location.Y:F1}");
             ImGui.TextUnformatted($"余额 {Money(s.Before)} → {Money(s.After)}");ImGui.TextWrapped("识别依据："+s.Source);
-            if(s.Detail.Length>0)ImGui.TextWrapped(s.Detail);if(s.ItemId!=null)ImGui.TextWrapped($"物品：{s.ItemName??s.ItemId.ToString()} × {s.Quantity}");if(s.Destination!=null)ImGui.TextWrapped("目的地："+s.Destination);
+            if(s.Detail.Length>0)ImGui.TextWrapped(s.Detail);if(s.ItemId!=null)ImGui.TextWrapped($"物品：{s.ItemName??s.ItemId.ToString()} × {s.Quantity}");if(s.Destination!=null&&s.Category!=Category.Teleport)ImGui.TextWrapped("目的地："+s.Destination);
         }
     }
     private void Settings() {
