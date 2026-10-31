@@ -70,7 +70,7 @@ Motion.Approach、Reveal 和 AppWindow 折叠会检查 UiBuilder.ShouldUseReduce
 
 动画状态字典是静态且从当前文件看无统一清理；动态ID可能增长，不能把它当无限列表模板。窗口析构、字形重建、皮肤栈与字体栈释放需按实际生命周期管理。Alpha 通过 ImGui 样式控制时，自绘颜色须使用 GetColorU32 或显式乘样式alpha；直接 ColorConvertFloat4ToU32 会绕过淡入，不能以为压 Alpha 就全部生效。
 
-## 7. 当前金币账本差距与实施顺序
+## 7. 当前小肥记账差距与实施顺序
 
 | 能力 | 参考插件 | 账本当前状态 |
 |---|---|---|
@@ -104,4 +104,4 @@ Motion.Approach、Reveal 和 AppWindow 折叠会检查 UiBuilder.ShouldUseReduce
 
 ## 独立视觉修订（2026-10-31）
 
-用户撤回视觉复现方向，要求仅参考规范和动效。金币账本现改为 Paper & Pine 暖纸白、墨绿、铜金与顶部文字导航，移除紫色光晕、玻璃渐变和图标侧栏。前文标志性尺寸描述用于来源分析，不再作为本项目外观验收标准。可编辑矢量设计板及实际渲染对照见 [design/README.md](design/README.md)。保留托管字体、交互状态、Reduced motion、指数趋近、260ms 切页与280ms 反向折叠。周期选项现为当月/当年/所有，组成图改为矩形树图。
+用户撤回视觉复现方向，要求仅参考规范和动效。小肥记账现改为 Paper & Pine 暖纸白、墨绿、铜金与顶部文字导航，移除紫色光晕、玻璃渐变和图标侧栏。前文标志性尺寸描述用于来源分析，不再作为本项目外观验收标准。可编辑矢量设计板及实际渲染对照见 [design/README.md](design/README.md)。保留托管字体、交互状态、Reduced motion、指数趋近、260ms 切页与280ms 反向折叠。周期选项现为当月/当年/所有，组成图改为矩形树图。

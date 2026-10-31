@@ -5,7 +5,7 @@ namespace JiZhang;
 internal sealed class LedgerWindow : Window
 {
     private readonly LedgerView view;
-    public LedgerWindow(Plugin plugin) : base("金币账本###JiZhang",ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse) {
+    public LedgerWindow(Plugin plugin) : base("小肥记账###JiZhang",ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse) {
         view=new(plugin);
         Size=new Vector2(1040,780);
         SizeCondition=ImGuiCond.FirstUseEver;

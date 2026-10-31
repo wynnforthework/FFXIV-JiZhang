@@ -44,6 +44,6 @@ dotnet run --project tools/JiZhang.Preview -- artifacts/ui-motion --motion
 
 ### AutoDuty 对照与本机排查
 
-AutoDuty 的 `AutoDuty/AutoDuty.json` 使用标准 `ImageUrls` 数组指向图片服务，并未通过插件代码向安装器注入截图。金币账本采用同一清单机制，另为开发插件提供 `images/image1.png` 至 `image3.png`。
+AutoDuty 的 `AutoDuty/AutoDuty.json` 使用标准 `ImageUrls` 数组指向图片服务，并未通过插件代码向安装器注入截图。小肥记账采用同一清单机制，另为开发插件提供 `images/image1.png` 至 `image3.png`。
 
-本机当前启用的开发插件路径为 `artifacts/JiZhang/JiZhang.dll`；排查时必须检查该路径旁的清单和图片，不能只检查 `bin/Release`。本轮已核实当前目录中的三张图片符合尺寸限制、与清单远程 URL 的内容一致且远程可访问。日志中08:18的旧图错误分别为1040×1000、1040×780、1040×960；之后重载插件没有触发图片重新加载。故不能把文件修复后直接视作安装器画面已验证，需重启后在安装器展开金币账本条目检查。
+本机当前启用的开发插件路径为 `artifacts/JiZhang/JiZhang.dll`；排查时必须检查该路径旁的清单和图片，不能只检查 `bin/Release`。本轮已核实当前目录中的三张图片符合尺寸限制、与清单远程 URL 的内容一致且远程可访问。日志中08:18的旧图错误分别为1040×1000、1040×780、1040×960；之后重载插件没有触发图片重新加载。故不能把文件修复后直接视作安装器画面已验证，需重启后在安装器展开小肥记账条目检查。

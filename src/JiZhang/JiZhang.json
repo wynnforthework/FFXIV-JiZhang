@@ -1,6 +1,6 @@
 {
   "Author": "wynnforthework",
-  "Name": "金币账本",
+  "Name": "小肥记账",
   "InternalName": "JiZhang",
   "AssemblyVersion": "0.1.1.0",
   "Description": "自动记录当前角色的金币收入与支出，查看交易时间、地点、用途及余额变化。提供当月、当年和全部历史的收支趋势与支出去向，支持流水筛选、分类详情、CSV 导出、账本备份及按角色独立保存。",

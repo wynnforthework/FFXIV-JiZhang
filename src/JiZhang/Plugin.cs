@@ -58,7 +58,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
         fonts = new(Interface.UiBuilder, Config);
         window = new(this);
         windows.AddWindow(window);
-        Commands.AddHandler("/jizhang", new CommandInfo((_, _) => window.IsOpen = !window.IsOpen) { HelpMessage = "打开金币账本" });
+        Commands.AddHandler("/jizhang", new CommandInfo((_, _) => window.IsOpen = !window.IsOpen) { HelpMessage = "打开小肥记账" });
         Interface.UiBuilder.Draw += Draw;
         Interface.UiBuilder.OpenMainUi += Open;
         Interface.UiBuilder.OpenConfigUi += Open;
@@ -130,7 +130,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
         } catch (Exception e) {
             if (restoring) { restoring = false; restoreTask = null; restoreStates = null; Status = "恢复失败，原账本保留：" + e.Message; }
             else { fatalError = e.Message; Status = "记录已暂停，请重新加载插件：" + e.Message; }
-            Log.Error(e, "金币账本记录失败");
+            Log.Error(e, "小肥记账记录失败");
         }
     }
     private Location ReadLocation() {

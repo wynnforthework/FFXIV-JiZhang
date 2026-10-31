@@ -109,7 +109,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         if(ImGui.IsItemHovered()&&ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))ToggleFold();
         if(ImGui.IsItemActive()&&ImGui.IsMouseDragging(ImGuiMouseButton.Left))ImGui.SetWindowPos(origin+ImGui.GetIO().MouseDelta);
         BookIcon(origin+new Vector2(26,26)*Unit,12*Unit,Gold);
-        draw.AddText(origin+new Vector2(51,17)*Unit,Color(Ink),"金币账本");
+        draw.AddText(origin+new Vector2(51,17)*Unit,Color(Ink),"小肥记账");
         var status=plugin.Current==null?"等待登录":plugin.Status.StartsWith("正在自动记录",StringComparison.Ordinal)?"记录中":"请检查记录状态";
         var statusColor=status=="记录中"?Green:Muted;
         var pill=origin+new Vector2(139,14)*Unit;var pillSize=new Vector2(ImGui.CalcTextSize(status).X+30*Unit,24*Unit);

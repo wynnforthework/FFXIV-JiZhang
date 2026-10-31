@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1080" viewBox="0 0 1440 1080"><style>text{font-family:Microsoft YaHei,Noto Sans CJK SC,sans-serif;fill:#243835} .muted{fill:#66756e}</style>
 <rect x="0" y="0" width="1440" height="1080" rx="0" fill="#e5e9df" stroke="none"/>
-<text x="42" y="53" font-size="26" fill="#243835" style="fill:#243835">金币账本 / PAPER &amp; PINE</text>
+<text x="42" y="53" font-size="26" fill="#243835" style="fill:#243835">小肥记账 / PAPER &amp; PINE</text>
 <text x="42" y="84" font-size="15" fill="#66756e" style="fill:#66756e">独立视觉设计 · 原生 ImGui 实现规范 · 2026.10</text>
 <rect x="42" y="116" width="1040" height="900" rx="8" fill="#f2f0e6" stroke="#cdd3c5"/>
 <rect x="42" y="116" width="1040" height="96" rx="8" fill="#fefcf6" stroke="none"/>
-<text x="66" y="149" font-size="17" fill="#98632b" style="fill:#98632b">▤  金币账本</text>
+<text x="66" y="149" font-size="17" fill="#98632b" style="fill:#98632b">▤  小肥记账</text>
 <text x="210" y="149" font-size="14" fill="#287259" style="fill:#287259">● 记录中</text>
 <text x="1006" y="149" font-size="22" fill="#243835" style="fill:#243835">⌄    ×</text>
 <text x="90" y="193" font-size="15" fill="#296457" style="fill:#296457">资产概览</text>

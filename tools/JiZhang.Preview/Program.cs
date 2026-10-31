@@ -30,7 +30,7 @@ unsafe {
             if((name=="year"||name=="all")&&frame is 3 or 4) {var r=view.HitRegions["range-"+(name=="year"?1:2)];io.AddMousePosEvent((r.X+r.Z)/2,(r.Y+r.W)/2);io.AddMouseButtonEvent(0,frame==3);}
             ImGui.NewFrame();LedgerTheme.Push();
             ImGui.SetNextWindowPos(Vector2.Zero,ImGuiCond.Always);ImGui.SetNextWindowSize(new(width,height),ImGuiCond.Always);
-            if(ImGui.Begin("金币账本###JiZhang",ref open,ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse))view.Draw();
+            if(ImGui.Begin("小肥记账###JiZhang",ref open,ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse))view.Draw();
             ImGui.End();LedgerTheme.Pop();ImGui.Render();
         }
         if(name=="scrolled") {
@@ -81,7 +81,7 @@ unsafe {
             ImGui.SetNextWindowPos(Vector2.Zero,ImGuiCond.Always);
             if(frame==0)ImGui.SetNextWindowSize(new(936,768),ImGuiCond.Always);
             var open=true;
-            ImGui.Begin("金币账本###JiZhang",ref open,ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse);
+            ImGui.Begin("小肥记账###JiZhang",ref open,ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse);
             view.Draw();var size=ImGui.GetWindowSize();
             rows.Add(new{frame,time=model.UiTime,tab=view.ActiveTab,nav=view.NavPosition,range=view.ActiveRange,rangePosition=view.RangePosition,reveal=view.PageProgress,fold=view.FoldAmount,height=size.Y,reduced=model.ReducedMotion,closed=view.CloseRequested,direction=view.DirectionForPreview,transfers=model.Config.ExcludeTransfers});
             ImGui.End();LedgerTheme.Pop();ImGui.Render();
