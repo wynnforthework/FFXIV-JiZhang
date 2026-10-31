@@ -12,7 +12,7 @@ using JiZhang.Core;
 using Lumina.Excel.Sheets;
 
 namespace JiZhang;
-public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
+public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
 {
     [PluginService] internal static IDalamudPluginInterface Interface { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
@@ -65,6 +65,7 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
         Chat.ChatMessage += OnChat;
         Market.PurchaseRequested += OnMarketRequest;
         Market.ItemPurchased += OnMarketPurchase;
+        StartTeleportAdapter();
     }
     private void Draw() => windows.Draw();
     private void Open() => window.IsOpen = true;
@@ -83,13 +84,16 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
             }
             if (engine == null) { if (!initial.IsCompleted) return; engine = new(initial.GetAwaiter().GetResult()); }
             if (Store.LastError != null) { Status = "存储出错，已暂停记录：" + Store.LastError; return; }
+            teleport.Expire(DateTimeOffset.UtcNow);
+            // Zoning may temporarily unload player state; an in-flight request keeps its baseline.
+            if(Client.IsLoggedIn&&teleport.Pending&&(!Player.IsLoaded||Player.ContentId==0))return;
             if (!Client.IsLoggedIn || !Player.IsLoaded || Player.ContentId == 0) {
-                Save(engine.Suspend(DateTimeOffset.UtcNow)); Current = null; activeCharacter = 0; Status = "等待角色登录"; return;
+                Save(engine.Suspend(DateTimeOffset.UtcNow)); Current = null; activeCharacter = 0; teleport.Reset(); Status = "等待角色登录"; return;
             }
             var manager = InventoryManager.Instance();
-            if (manager == null) { Save(engine.Suspend(DateTimeOffset.UtcNow)); return; }
+            if (manager == null) { if(!teleport.Pending)Save(engine.Suspend(DateTimeOffset.UtcNow)); return; }
             var currency = manager->GetInventoryContainer(InventoryType.Currency);
-            if (currency == null || !currency->IsLoaded) { Save(engine.Suspend(DateTimeOffset.UtcNow)); return; }
+            if (currency == null || !currency->IsLoaded) { if(!teleport.Pending)Save(engine.Suspend(DateTimeOffset.UtcNow)); return; }
             var now = DateTimeOffset.UtcNow;
             var location = ReadLocation();
             var balance = manager->GetGil();
@@ -99,6 +103,13 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
             if (old != null && old.CharacterId == sample.CharacterId && old.Location.TerritoryId != location.TerritoryId && sample.Balance < old.Balance)
                 sample = sample with { Location = old.Location };
             if (activeCharacter != sample.CharacterId) { activeCharacter = sample.CharacterId; Entries = []; dirty = true; }
+            // Evidence must arrive before Observe flushes mature debits. Arrival uses the actual area,
+            // while the entry stores the request's departure snapshot.
+            var delta=old?.CharacterId==sample.CharacterId?sample.Balance-old.Balance:0;
+            var departure=teleport.Departure;
+            var teleportEvidence=teleport.Observe(sample with {Location=location},delta);
+            if(teleportEvidence!=null)engine.AddEvidence(teleportEvidence);
+            if((delta<0&&departure!=null&&teleport.Pending)||teleportEvidence!=null)sample=sample with {Location=departure??sample.Location};
             Save(engine.Observe(sample)); Current = sample;
             while (incoming.TryDequeue(out var e)) {
                 if (e.ItemId.HasValue) {
@@ -162,7 +173,7 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
     private void RestoreCore(string path) {
         if (restoring || engine == null) return;
         Save(engine.Suspend(DateTimeOffset.UtcNow));
-        restoring = true; activeCharacter = 0; Current = null;
+        restoring = true; activeCharacter = 0; Current = null; teleport.Reset();
         while (incoming.TryDequeue(out _)) { }
         lock (marketLock) request = null;
         restoreTask = Store.RestoreAsync(path);
@@ -181,6 +192,7 @@ public sealed class Plugin : IDalamudPlugin, ILedgerUiContext
     void ILedgerUiContext.Restore(string path) => Restore(path);
     public void Dispose() {
         disposed = true;
+        teleportHook?.Dispose(); teleport.Reset();
         Framework.Update -= Update; Chat.ChatMessage -= OnChat;
         Market.PurchaseRequested -= OnMarketRequest; Market.ItemPurchased -= OnMarketPurchase;
         Interface.UiBuilder.Draw -= Draw; Interface.UiBuilder.OpenMainUi -= Open; Interface.UiBuilder.OpenConfigUi -= Open;

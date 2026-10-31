@@ -51,10 +51,12 @@ public sealed class LedgerEngine
                 var candidates = evidence.Where(e => e.CharacterId == entry.CharacterId && e.Amount == entry.Amount &&
                     (e.Time - entry.Time).Duration() <= CorrelationWindow).ToList();
                 // Ambiguous or overlapping matches stay unknown; no fabricated split or item attribution.
-                var unique = candidates.GroupBy(e => (e.Category, e.ItemId, e.Quantity, e.Destination)).ToList();
+                var unique = candidates.GroupBy(e => (e.Category, e.ItemId, e.Quantity)).ToList();
+                // Missing destination is compatible with a more detailed confirmation; two distinct destinations conflict.
+                var destinationConflict=candidates.Where(e=>e.Destination!=null).Select(e=>e.Destination).Distinct().Skip(1).Any();
                 var competing = pending.Count(p => p.CharacterId == entry.CharacterId && p.Amount == entry.Amount && !p.IsGap &&
                     candidates.Any(e => (p.Time - e.Time).Duration() <= CorrelationWindow));
-                var match = !entry.IsGap && unique.Count == 1 && competing == 1 ? candidates.First() : null;
+                var match = !entry.IsGap && unique.Count == 1 && !destinationConflict && competing == 1 ? candidates.OrderByDescending(e=>e.Destination!=null).First() : null;
                 entries.Add(match == null ? entry : entry with { Category = match.Category, Detail = match.Detail,
                     Source = match.Source, ItemId = match.ItemId, ItemName = match.ItemName, Quantity = match.Quantity, Destination = match.Destination });
                 foreach (var e in candidates) evidence.Remove(e);

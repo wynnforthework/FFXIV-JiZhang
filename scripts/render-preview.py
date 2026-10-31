@@ -11,6 +11,7 @@ for meta in root.glob('atlas-*.json'):
  d=json.loads(meta.read_text());index=int(meta.stem.split('-')[1])+1
  atlases[index]=np.frombuffer(meta.with_suffix('.rgba').read_bytes(),np.uint8).reshape(d['height'],d['width'],4)
 for source in root.glob('*.bin'):
+ if len(sys.argv)>2 and source.stem not in sys.argv[2:]:continue
  data=memoryview(source.read_bytes());offset=0
  def read(fmt):
   global offset

@@ -8,7 +8,7 @@ internal sealed partial class LedgerView
         if(string.IsNullOrEmpty(text))return;
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,new Vector2(14,11)*Unit);
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing,new Vector2(0,5)*Unit);
-        ImGui.PushStyleColor(ImGuiCol.PopupBg,new Vector4(.142f,.155f,.196f,.98f));
+        ImGui.PushStyleColor(ImGuiCol.PopupBg,Surface);
         ImGui.PushStyleColor(ImGuiCol.Text,Ink);
         try {ImGui.BeginTooltip();ImGui.PushTextWrapPos(320*Unit);ImGui.TextUnformatted(text);ImGui.PopTextWrapPos();ImGui.EndTooltip();}
         finally {ImGui.PopStyleColor(2);ImGui.PopStyleVar(2);}
@@ -27,12 +27,12 @@ internal sealed partial class LedgerView
         var hover=motion.Approach(id+"-hover",ImGui.IsItemHovered()?1:0,18);
         if(ImGui.IsItemHovered())ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
         var on=motion.Approach(id+"-on",value?1:0,16);
-        var track=Vector4.Lerp(Vector4.Lerp(Surface2,new(.22f,.24f,.30f,1),hover),Accent,on);
+        var track=Vector4.Lerp(Vector4.Lerp(Surface2,Border,hover),Accent,on);
         draw.AddRectFilled(pos,pos+size,Color(track),11*Unit);
-        draw.AddRect(pos,pos+size,Color(Vector4.Lerp(Border,new(.78f,.60f,1,1),on*.6f)),11*Unit);
+        draw.AddRect(pos,pos+size,Color(Vector4.Lerp(Border,Accent,on*.6f)),11*Unit);
         var center=pos+new Vector2(11+18*on,11)*Unit;
         draw.AddCircleFilled(center+new Vector2(0,Unit),8*Unit,Color(new(0,0,0,.3f)));
-        draw.AddCircleFilled(center,8*Unit,Color(Ink));
+        draw.AddCircleFilled(center,8*Unit,Color(new(1,1,1,1)));
         if(labelHovered)Tooltip(help);
         ImGui.SetCursorScreenPos(origin);ImGui.Dummy(new(width,40*Unit));
         return clicked;
@@ -46,8 +46,8 @@ internal sealed partial class LedgerView
         var expanded=motion.Approach(id+"-expanded",open?1:0,16);
         if(ImGui.IsItemHovered())ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
         if(clicked&&!open){ImGui.OpenPopup(popup);popupTimes[id]=plugin.UiTime;open=true;}
-        var border=Vector4.Lerp(Border,new(.78f,.60f,1,.85f),Math.Max(hover*.6f,expanded));
-        SurfaceBox(origin,origin+size,Vector4.Lerp(Surface2,new(.22f,.20f,.29f,1),hover),border,7*Unit);
+        var border=Vector4.Lerp(Border,Accent,Math.Max(hover*.6f,expanded));
+        SurfaceBox(origin,origin+size,Vector4.Lerp(Surface2,Border,hover),border,7*Unit);
         var draw=ImGui.GetWindowDrawList();var label=labels[Math.Clamp(selected,0,labels.Length-1)];
         while(label.Length>1&&ImGui.CalcTextSize(label).X>width-44*Unit)label=label[..^2]+"…";
         draw.AddText(origin+new Vector2(11*Unit,(size.Y-ImGui.GetFontSize())/2),Color(Ink),label);
@@ -64,7 +64,7 @@ internal sealed partial class LedgerView
         ImGui.SetNextWindowPos(new(x,above?origin.Y-6*Unit-height:below));ImGui.SetNextWindowSize(new(width,height));
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,new Vector2(6)*Unit);
         ImGui.PushStyleVar(ImGuiStyleVar.Alpha,ImGui.GetStyle().Alpha*Math.Max(.05f,reveal));
-        ImGui.PushStyleColor(ImGuiCol.PopupBg,new Vector4(.108f,.118f,.152f,.99f));
+        ImGui.PushStyleColor(ImGuiCol.PopupBg,Surface);
         var changed=false;
         if(ImGui.BeginPopup(popup,ImGuiWindowFlags.NoMove|ImGuiWindowFlags.NoSavedSettings)) {
             for(var i=0;i<labels.Length;i++) {
@@ -92,7 +92,7 @@ internal sealed partial class LedgerView
         ImGui.PopTextWrapPos();ImGui.PopItemWidth();ImGui.EndGroup();
         var bottom=ImGui.GetItemRectMax().Y+16*Unit;
         var draw=ImGui.GetWindowDrawList();draw.ChannelsSetCurrent(0);
-        SurfaceBox(groupOrigin,new(groupOrigin.X+groupWidth,bottom),new(.105f,.105f,.145f,.98f),new(.26f,.24f,.34f,.8f),12*Unit);
+        SurfaceBox(groupOrigin,new(groupOrigin.X+groupWidth,bottom),Surface,Border,12*Unit);
         draw.ChannelsMerge();ImGui.SetCursorScreenPos(new(groupOrigin.X,bottom));ImGui.Dummy(new(groupWidth,10*Unit));
     }
     private bool ActionButton(string label) {
@@ -100,7 +100,7 @@ internal sealed partial class LedgerView
         var clicked=ImGui.InvisibleButton(label,size);var hover=motion.Approach("button-"+label,ImGui.IsItemHovered()?1:0,18);
         var press=motion.Approach("press-"+label,ImGui.IsItemActive()?1:0,30);
         var lift=(hover-press)*Unit;var pos=origin-new Vector2(0,lift);
-        SurfaceBox(pos,pos+size,Vector4.Lerp(Surface2,new(.27f,.22f,.38f,1),hover),Vector4.Lerp(Border,new(.62f,.47f,.80f,.65f),hover),7*Unit);
+        SurfaceBox(pos,pos+size,Vector4.Lerp(Surface2,Border,hover),Vector4.Lerp(Border,Accent,hover),7*Unit);
         ImGui.GetWindowDrawList().AddText(pos+(size-ImGui.CalcTextSize(label))/2,Color(Ink),label);
         if(ImGui.IsItemHovered())ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
         return clicked;

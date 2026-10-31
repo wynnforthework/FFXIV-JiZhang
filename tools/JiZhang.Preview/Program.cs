@@ -21,16 +21,25 @@ unsafe {
         File.WriteAllBytes(Path.Combine(root,$"atlas-{t}.rgba"),new ReadOnlySpan<byte>(pixels,w*h*4).ToArray());
         File.WriteAllText(Path.Combine(root,$"atlas-{t}.json"),JsonSerializer.Serialize(new{width=w,height=h}));
     }
-    foreach(var scenario in (args.Contains("--motion")?Array.Empty<(string,bool,int,int,int,float)>():new[]{("empty",false,0,1040,780,1f),("populated",true,0,1040,780,1f),("reference-size",true,0,936,768,1f),("expense-only",true,0,1040,780,1f),("income-only",true,0,1040,780,1f),("huge-income",true,0,1040,780,1f),("huge-expense",true,0,1040,780,1f),("transactions",true,1,1040,780,1f),("empty-transactions",false,1,1040,780,1f),("settings",false,2,1040,820,1f),("narrow",true,0,760,780,1f),("scaled",true,0,1040,780,1.6f)})) {
+    foreach(var scenario in (args.Contains("--motion")?Array.Empty<(string,bool,int,int,int,float)>():new[]{("empty",false,0,1040,780,1f),("populated",true,0,1040,780,1f),("mixed-categories",true,0,1040,780,1f),("reference-size",true,0,936,768,1f),("scrolled",true,0,936,768,1f),("year",true,0,1040,780,1f),("all",true,0,1040,780,1f),("expense-only",true,0,1040,780,1f),("income-only",true,0,1040,780,1f),("huge-income",true,0,1040,780,1f),("huge-expense",true,0,1040,780,1f),("transactions",true,1,1040,780,1f),("empty-transactions",false,1,1040,780,1f),("settings",false,2,1040,820,1f),("narrow",true,0,760,780,1f),("scaled",true,0,1040,780,1.6f)})) {
         var (name,data,tab,width,height,scale)=scenario;
         var model=new PreviewContext(data,name);model.Config.Scale=scale;var view=new LedgerView(model);view.SelectTab(tab);
         io.DisplaySize=new(width,height);var open=true;
-        for(var frame=0;frame<3;frame++) {
-            model.UiTime=frame/60d;io.MousePos=new(470,480);ImGui.NewFrame();LedgerTheme.Push();
+        for(var frame=0;frame<6;frame++) {
+            model.UiTime=frame/60d;io.MousePos=new(470,480);if(name=="scrolled"&&frame==3)io.AddMouseWheelEvent(0,-5);
+            if((name=="year"||name=="all")&&frame is 3 or 4) {var r=view.HitRegions["range-"+(name=="year"?1:2)];io.AddMousePosEvent((r.X+r.Z)/2,(r.Y+r.W)/2);io.AddMouseButtonEvent(0,frame==3);}
+            ImGui.NewFrame();LedgerTheme.Push();
             ImGui.SetNextWindowPos(Vector2.Zero,ImGuiCond.Always);ImGui.SetNextWindowSize(new(width,height),ImGuiCond.Always);
             if(ImGui.Begin("金币账本###JiZhang",ref open,ImGuiWindowFlags.NoTitleBar|ImGuiWindowFlags.NoCollapse|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoScrollWithMouse))view.Draw();
             ImGui.End();LedgerTheme.Pop();ImGui.Render();
         }
+        if(name=="scrolled") {
+            if(view.ContentScrollForPreview<=0||view.PanelScrollForPreview.Values.Any(v=>v!=0))throw new Exception("Wheel input must scroll the outer viewport only");
+            var card=view.HitRegions["panel-recent"];var title=view.HitRegions["recent-title"];
+            if(title.Y<card.Y||title.W>card.W)throw new Exception("Recent header escaped card bounds");
+            Console.WriteLine("Scroll: outer viewport moves, all cards remain at zero inner offset; recent header stays inside card.");
+        }
+        if(name=="year"&&view.ActiveRange!=1||name=="all"&&view.ActiveRange!=2)throw new Exception("Period click failed");
         SaveDraw(name,width,height);
     }
     void SaveDraw(string name,int width,int height) {
@@ -53,19 +62,19 @@ unsafe {
             if(frame==180)model.ReducedMotion=true;
             var mouse=new Vector2(-100,-100);var down=false;
             // Actual pointer press and release; each target is held for two frames.
-            if(frame is >=4 and <=6){mouse=new(30,150);down=frame<6;} // transactions
+            if(frame is >=4 and <=6){mouse=Target("nav-1");down=frame<6;} // transactions
             Vector2 Target(string id){var r=view.HitRegions[id];return new((r.X+r.Z)/2,(r.Y+r.W)/2);}
             if(frame is >=26 and <=28){mouse=Target("direction");down=frame<28;} // direction dropdown
             if(frame is >=36 and <=38){mouse=Target("direction-option-2");down=frame<38;} // popup item
-            if(frame is >=46 and <=48){mouse=new(30,185);down=frame<48;} // settings
+            if(frame is >=46 and <=48){mouse=Target("nav-2");down=frame<48;} // settings
             if(frame is >=62 and <=64 && view.HitRegions.ContainsKey("transfers")){mouse=Target("transfers");down=frame<64;} // switch
             if(frame is >=78 and <=80){mouse=new(868,25);down=frame<80;} // fold
             if(frame is >=86 and <=88){mouse=new(868,25);down=frame<88;} // reverse before settled
-            if(frame is >=110 and <=112){mouse=new(30,85);down=frame<112;} // overview
-            if(frame is >=126 and <=128){mouse=new(332,324);down=frame<128;} // 30 days
+            if(frame is >=110 and <=112){mouse=Target("nav-0");down=frame<112;} // overview
+            if(frame is >=126 and <=128){mouse=Target("range-2");down=frame<128;} // 30 days
             if(frame is >=146 and <=148){mouse=new(868,25);down=frame<148;}
             if(frame is >=182 and <=184){mouse=new(868,25);down=frame<184;}
-            if(frame is >=194 and <=196){mouse=new(30,185);down=frame<196;}
+            if(frame is >=194 and <=196){mouse=Target("nav-2");down=frame<196;}
             if(frame is >=208 and <=210){mouse=new(906,25);down=frame<210;}
             io.AddMousePosEvent(mouse.X,mouse.Y);io.AddMouseButtonEvent(0,down);
             ImGui.NewFrame();LedgerTheme.Push();
@@ -79,7 +88,7 @@ unsafe {
             if(samples.Contains(frame)||frame is 160 or 174 or 184 or 196 or 212)SaveDraw($"motion-{frame:000}",936,768);
         }
         File.WriteAllText(Path.Combine(root,"motion-state.json"),JsonSerializer.Serialize(rows,new JsonSerializerOptions{WriteIndented=true}));
-        if(view.ActiveTab!=2||!model.Config.ExcludeTransfers||!view.CloseRequested)throw new Exception("Native click sequence failed");
+        if(view.ActiveTab!=2||view.ActiveRange!=2||!model.Config.ExcludeTransfers||!view.CloseRequested)throw new Exception("Native click sequence failed");
         // Reduced-motion state must settle immediately, including after a mid-transition toggle.
         model.ReducedMotion=true;view.ToggleFold();view.PrepareFrame();
         if(view.FoldAmount!=1)throw new Exception("Reduced-motion fold did not settle");
@@ -109,7 +118,7 @@ namespace JiZhang {
                     "huge-expense"=>i%3==0?580+i*80:-12000000-i*110,
                     _=>i%3==0?2800+i*110:-1580-i*80
                 };
-                list.Add(new(i.ToString(),1,"示例角色",DateTimeOffset.Now.AddDays(-i),balance-amount,balance,new(128,"利姆萨·罗敏萨"),amount>0?Category.QuestReward:i%2==0?Category.MarketPurchase:Category.Teleport));
+                list.Add(new(i.ToString(),1,"示例角色",DateTimeOffset.Now.AddDays(-i),balance-amount,balance,new(128,"利姆萨·罗敏萨"),amount>0?Category.QuestReward:scenario=="mixed-categories"?new[]{Category.Teleport,Category.Repair,Category.NpcPurchase,Category.MarketPurchase,Category.PlayerTrade,Category.RetainerTransfer}[i%6]:i%2==0?Category.MarketPurchase:Category.Teleport));
             }Entries=list.ToArray();
         }
         public void SaveConfig(){}public Task<string> ExportAsync()=>Task.FromResult("预览");public Task<string> BackupAsync()=>Task.FromResult("预览");public void Restore(string path){}

@@ -11,8 +11,9 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
     private int tab;
     private string keyword="",from="",to="",location="";
     private int direction,page;
-    private int rangeChoice=1;
-    private int TrendDays=>new[]{7,14,30}[rangeChoice];
+    private int rangeChoice;
+    private DateTime[] bucketDates=[];
+    private string PeriodLabel=>new[]{"当月","当年","所有"}[rangeChoice];
     private Category? category;
     private LedgerEntry? selected;
     private Task<string>? action;
@@ -45,6 +46,8 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
     internal int DirectionForPreview=>direction;
     internal int ActiveTab=>tab;
     internal int ActiveRange=>rangeChoice;
+    internal float ContentScrollForPreview{get;private set;}
+    internal Dictionary<string,float> PanelScrollForPreview{get;}=[];
     internal void PrepareFrame()=>fold.Update(plugin.UiTime,plugin.ReducedMotion);
     internal void OnOpen(){motion.Clear();}
     internal void ToggleFold(){fold.Toggle(plugin.UiTime);}
@@ -60,23 +63,22 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         if(tabForPreview>=0){tab=tabForPreview;tabForPreview=-1;}
         Refresh();
         var origin=ImGui.GetWindowPos();var size=ImGui.GetWindowSize();
-        var header=52*Unit;var rail=64*Unit;var footer=32*Unit;
+        var header=96*Unit;var rail=0f;var footer=32*Unit;
         if(!IsFolding&&wasFolding) {ImGui.SetWindowSize(expandedSize);size=ImGui.GetWindowSize();wasFolding=false;}
         else if(!IsFolding)expandedSize=size;
-        else if(expandedSize.Y>0) {wasFolding=true;ImGui.SetWindowSize(new Vector2(size.X,expandedSize.Y+(header-expandedSize.Y)*fold.Value));size=ImGui.GetWindowSize();}
+        else if(expandedSize.Y>0) {wasFolding=true;ImGui.SetWindowSize(new Vector2(size.X,expandedSize.Y+(52*Unit-expandedSize.Y)*fold.Value));size=ImGui.GetWindowSize();}
         Ambient(origin,size);
-        Chrome(origin,size,header);
+        Chrome(origin,size,Math.Min(header,size.Y));
         if(fold.Value>=.999f)return;
         ImGui.PushStyleVar(ImGuiStyleVar.Alpha,ImGui.GetStyle().Alpha*(1-fold.Value));
         var draw=ImGui.GetWindowDrawList();
-        draw.AddLine(origin+new Vector2(rail,header+12*Unit),origin+new Vector2(rail,size.Y-footer-12*Unit),Color(new(1,1,1,.055f)));
-        ImGui.SetCursorScreenPos(origin+new Vector2(10*Unit,header+12*Unit));
-        if(ImGui.BeginChild("navigation",new Vector2(44*Unit,size.Y-header-footer-12*Unit),false,ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoBackground))Sidebar();
-        ImGui.EndChild();
+        ImGui.SetCursorScreenPos(origin+new Vector2(24,54)*Unit);
+        Sidebar();
         ImGui.SetCursorScreenPos(origin+new Vector2(rail,header));
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,new Vector2(26,22)*Unit);
         if(ImGui.BeginChild("content",new Vector2(size.X-rail-6*Unit,size.Y-header-footer),false,ImGuiWindowFlags.NoBackground|ImGuiWindowFlags.AlwaysUseWindowPadding)) {
             if(resetScroll){ImGui.SetScrollY(0);resetScroll=false;}
+            ContentScrollForPreview=ImGui.GetScrollY();
             PageProgress=motion.Reveal("page",tab);
             ImGui.SetCursorPosY(ImGui.GetCursorPosY()+(1-PageProgress)*12*Unit);
             ImGui.PushStyleVar(ImGuiStyleVar.Alpha,ImGui.GetStyle().Alpha*Math.Max(.001f,PageProgress));
@@ -85,8 +87,8 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         ImGui.PopStyleVar();
         }ImGui.EndChild();ImGui.PopStyleVar();
         var bottom=origin+new Vector2(0,size.Y-footer);
-        draw.AddRectFilled(bottom,origin+size,Color(new(.08f,.085f,.11f,1)),0f);
-        draw.AddLine(bottom,origin+new Vector2(size.X,size.Y-footer),Color(new(1,1,1,.055f)));
+        draw.AddRectFilled(bottom,origin+size,Color(Surface2),0f);
+        draw.AddLine(bottom,origin+new Vector2(size.X,size.Y-footer),Color(Border));
         draw.AddCircleFilled(bottom+new Vector2(22,16)*Unit,3*Unit,Color(plugin.Current==null?Muted:Green));
         draw.AddText(bottom+new Vector2(36,7)*Unit,Color(Muted),plugin.Current?.CharacterName??"等待角色登录");
         var note=exclude?"统计排除资金转移  ·  数据仅存本机":"自动记账  ·  数据仅存本机";
@@ -95,22 +97,15 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
     }
     private void Ambient(Vector2 origin,Vector2 size) {
         var draw=ImGui.GetWindowDrawList();
-        draw.PushClipRect(origin,origin+size,true);
-        void Blob(Vector2 center,float radius,Vector4 color,float alpha) {
-            for(var i=5;i>=1;i--)draw.AddCircleFilled(center,radius*i/5,Color(color with {W=alpha*(1-(i-1)/5f)}),64);
-        }
-        Blob(origin+size*new Vector2(.20f+.08f*motion.Wave(16),.14f+.06f*motion.Wave(21)),size.X*.45f,Accent,.055f);
-        Blob(origin+size*new Vector2(.86f+.06f*motion.Wave(19),.32f+.08f*motion.Wave(14)),size.X*.40f,new(.40f,.68f,.98f,1),.040f);
-        Blob(origin+size*new Vector2(.55f+.10f*motion.Wave(23),.96f+.05f*motion.Wave(17)),size.X*.42f,new(.95f,.45f,.78f,1),.035f);
-        draw.PopClipRect();
+        draw.AddRectFilled(origin,origin+size,Color(Canvas),8*Unit);
     }
     private void Chrome(Vector2 origin,Vector2 size,float height) {
         var draw=ImGui.GetWindowDrawList();
-        draw.AddRectFilled(origin,origin+new Vector2(size.X,height),Color(new(.108f,.118f,.152f,.4f)),14*Unit,ImDrawFlags.RoundCornersTop);
-        draw.AddLine(origin+new Vector2(0,height),origin+new Vector2(size.X,height),Color(new(1,1,1,.055f)));
+        draw.AddRectFilled(origin,origin+new Vector2(size.X,height),Color(Surface),8*Unit,ImDrawFlags.RoundCornersTop);
+        draw.AddLine(origin+new Vector2(0,height),origin+new Vector2(size.X,height),Color(Border));
         // The title has a real drag hit region; controls retain their own hit regions.
         ImGui.SetCursorScreenPos(origin);
-        ImGui.InvisibleButton("title-drag",new(size.X-94*Unit,height));
+        ImGui.InvisibleButton("title-drag",new(size.X-94*Unit,48*Unit));
         if(ImGui.IsItemHovered()&&ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))ToggleFold();
         if(ImGui.IsItemActive()&&ImGui.IsMouseDragging(ImGuiMouseButton.Left))ImGui.SetWindowPos(origin+ImGui.GetIO().MouseDelta);
         BookIcon(origin+new Vector2(26,26)*Unit,12*Unit,Gold);
@@ -152,49 +147,32 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         var month=new DateTime(date.Year,date.Month,1);
         todayTotal=Totals.From(source.Where(e=>e.Time.LocalDateTime.Date==date),exclude);
         monthTotal=Totals.From(source.Where(e=>e.Time.LocalDateTime>=month),exclude);
-        trend=Enumerable.Range(0,TrendDays).Select(i=>Totals.From(source.Where(e=>e.Time.LocalDateTime.Date==date.AddDays(i-(TrendDays-1))),exclude)).ToArray();
-        groups=source.Where(e=>!e.IsGap&&e.Amount<0&&e.Time.LocalDateTime>=month&&(!exclude||!e.Category.IsTransfer()))
-            .GroupBy(e=>e.Category).Select(g=>(g.Key,-g.Sum(e=>e.Amount))).OrderByDescending(g=>g.Item2).ToArray();
+        var report=LedgerReport.Create(source,date,(ReportPeriod)rangeChoice,exclude);
+        trend=report.Buckets.Select(b=>b.Total).ToArray();bucketDates=report.Buckets.Select(b=>b.Start).ToArray();
+        groups=report.Spending;
+
     }
     private void Sidebar() {
         var draw=ImGui.GetWindowDrawList();var origin=ImGui.GetCursorScreenPos();
         NavPosition=motion.Approach("nav-position",tab,16);
-        var indicator=origin+new Vector2(0,50*NavPosition)*Unit;
-        SurfaceBox(indicator,indicator+new Vector2(42,42)*Unit,new(.23f,.19f,.34f,1),new(.43f,.33f,.62f,1),11*Unit);
-        draw.AddRectFilled(indicator+new Vector2(-8,10)*Unit,indicator+new Vector2(-5,32)*Unit,Color(Accent),2*Unit);
+        var marker=origin+new Vector2(NavPosition*124,38)*Unit;
+        draw.AddRectFilled(marker,marker+new Vector2(100,3)*Unit,Color(Accent),1*Unit);
         for(var i=0;i<3;i++) {
-            var pos=origin+new Vector2(0,i*50)*Unit;var end=pos+new Vector2(42,42)*Unit;
-            ImGui.SetCursorScreenPos(pos);
-            if(ImGui.InvisibleButton("nav-"+i,new Vector2(42,42)*Unit)){Navigate(i);}
-            var hovered=ImGui.IsItemHovered();var active=tab==i;
-            var hover=motion.Approach("nav-hover-"+i,hovered?1:0,18);
-            var color=active?Ink:Vector4.Lerp(Muted,Ink,hover*.7f);
-            if(!active&&hover>.001f)draw.AddRectFilled(pos,end,Color(Surface2 with {W=hover*.8f}),11*Unit);
-            if(hovered)ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
-            var center=(pos+end)/2;
-            if(i==0) {
-                draw.AddLine(center+new Vector2(-9,8)*Unit,center+new Vector2(-9,-8)*Unit,Color(color),2*Unit);
-                draw.AddLine(center+new Vector2(-9,8)*Unit,center+new Vector2(9,8)*Unit,Color(color),2*Unit);
-                draw.AddLine(center+new Vector2(-5,2)*Unit,center+new Vector2(0,-3)*Unit,Color(color),2*Unit);
-                draw.AddLine(center+new Vector2(0,-3)*Unit,center+new Vector2(4,0)*Unit,Color(color),2*Unit);
-                draw.AddLine(center+new Vector2(4,0)*Unit,center+new Vector2(9,-7)*Unit,Color(color),2*Unit);
-            } else if(i==1)BookIcon(center,9*Unit,color);
-            else for(var j=0;j<3;j++) {
-                var y=center.Y+(j-1)*7*Unit;
-                draw.AddLine(new(center.X-9*Unit,y),new(center.X+9*Unit,y),Color(color),2*Unit);
-                draw.AddCircleFilled(new(center.X+(j%2==0?-3:4)*Unit,y),3*Unit,Color(color));
-            }
-            if(hovered)Tooltip(new[]{"资产概览","收支流水","偏好与数据"}[i]);
-            ImGui.Dummy(new(0,8*Unit));
+            var pos=origin+new Vector2(i*124,0)*Unit;var size=new Vector2(100,38)*Unit;
+            ImGui.SetCursorScreenPos(pos);HitRegions["nav-"+i]=new(pos.X,pos.Y,pos.X+size.X,pos.Y+size.Y);
+            if(ImGui.InvisibleButton("nav-"+i,size))Navigate(i);
+            var hover=motion.Approach("nav-hover-"+i,ImGui.IsItemHovered()?1:0,18);
+            if(i!=tab&&hover>.001f)draw.AddRectFilled(pos,pos+size,Color(Surface2 with {W=hover}),4*Unit);
+            var text=new[]{"资产概览","收支流水","偏好与数据"}[i];
+            draw.AddText(pos+(size-ImGui.CalcTextSize(text))/2,Color(tab==i?Accent:Muted),text);
+            if(ImGui.IsItemHovered())ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
         }
     }
     private void SurfaceBox(Vector2 min,Vector2 max,Vector4 fill,Vector4 border,float rounding) {
         var draw=ImGui.GetWindowDrawList();
-        for(var i=3;i>=1;i--)draw.AddRectFilled(min-new Vector2(i*2*Unit),max+new Vector2(i*2*Unit)+new Vector2(0,3*Unit),Color(new(0,0,0,.035f)),rounding+i*Unit);
-        var start=draw.VtxBuffer.Size;draw.AddRectFilled(min,max,Color(Vector4.One),rounding);
-        ImGuiP.ShadeVertsLinearColorGradientKeepAlpha(draw,start,draw.VtxBuffer.Size,min,new Vector2(min.X,max.Y),ImGui.ColorConvertFloat4ToU32(Vector4.Lerp(fill,Accent,.06f)),ImGui.ColorConvertFloat4ToU32(fill));
-        draw.AddRect(min,max,Color(border),rounding);
-        draw.AddLine(min+new Vector2(rounding,1*Unit),new(max.X-rounding,min.Y+Unit),Color(new(1,1,1,.055f)),Unit);
+        draw.AddRectFilled(min+new Vector2(0,2*Unit),max+new Vector2(0,2*Unit),Color(new(0,0,0,.025f)),6*Unit);
+        draw.AddRectFilled(min,max,Color(fill),6*Unit);
+        draw.AddRect(min,max,Color(border),6*Unit);
     }
     private void Heading(string title,string subtitle) {
         TextLarge(title,1.42f,Ink);ImGui.TextColored(Muted,subtitle);ImGui.Dummy(new(1,10*Unit));
@@ -208,20 +186,23 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
     private bool Panel(string id,Vector2 size,Vector4? bg=null) {
         var origin=ImGui.GetCursorScreenPos();var available=ImGui.GetContentRegionAvail();
         var extent=new Vector2(size.X<=0?available.X+size.X:size.X,size.Y<=0?available.Y+size.Y:size.Y);
-        SurfaceBox(origin+new Vector2(Unit),origin+extent-new Vector2(Unit),bg??new(.105f,.105f,.145f,.98f),new(.26f,.24f,.34f,.8f),12*Unit);
+        SurfaceBox(origin+new Vector2(Unit),origin+extent-new Vector2(Unit),bg??Surface,Border,6*Unit);
         ImGui.PushStyleColor(ImGuiCol.ChildBg,Vector4.Zero);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,new Vector2(18,16)*Unit);
-        var visible=ImGui.BeginChild(id,size,false,ImGuiWindowFlags.AlwaysUseWindowPadding|ImGuiWindowFlags.NoScrollbar|ImGuiWindowFlags.NoBackground);
+        var visible=ImGui.BeginChild(id,size,false,ImGuiWindowFlags.AlwaysUseWindowPadding|ImGuiWindowFlags.NoScrollWithMouse|ImGuiWindowFlags.NoBackground);
+        PanelScrollForPreview[id]=ImGui.GetScrollY();
+        HitRegions["panel-"+id]=new(origin.X,origin.Y,origin.X+extent.X,origin.Y+extent.Y);
+        ImGui.SetScrollY(0); // Cards share the outer viewport; never retain an inner scroll offset.
         return visible;
     }
     private static void EndPanel(){ImGui.EndChild();ImGui.PopStyleVar();ImGui.PopStyleColor();}
     private void Overview() {
         var hero=ImGui.GetCursorScreenPos();var available=ImGui.GetContentRegionAvail().X;
-        ImGui.TextColored(new Vector4(.80f,.72f,.95f,1),"资产概览");
+        ImGui.TextColored(Accent,"资产概览");
         ImGui.Dummy(new(1,2*Unit));
         TextLarge(plugin.Current==null?"等待登录":Money(plugin.Current.Balance),2f,Ink);
         ImGui.SameLine();ImGui.TextColored(Gold,"GIL");
-        ImGui.TextColored(Muted,"当前随身金币 · 每一笔流动，自动记录");
+        ImGui.TextColored(Muted,"随身余额 / GIL · 自动记账");
         if(available>650*Unit) {
             var draw=ImGui.GetWindowDrawList();var info=plugin.Current?.CharacterName??"登录后开始记录";
             draw.AddText(new(hero.X+available-ImGui.CalcTextSize(info).X,hero.Y+28*Unit),Color(Ink),info);
@@ -236,36 +217,38 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         if(inlineMetrics)ImGui.SameLine(0,gap);Metric("net","本月结余",monthTotal.Net.ToString("+#,0;-#,0;0"),"收入减去支出",Ink,width);
         ImGui.Dummy(new(1,4*Unit));
         var rangeOrigin=ImGui.GetCursorScreenPos();var rangeWidth=Math.Min(300*Unit,ImGui.GetContentRegionAvail().X);
-        SurfaceBox(rangeOrigin,rangeOrigin+new Vector2(rangeWidth,36*Unit),new(.082f,.09f,.118f,.95f),new(.235f,.262f,.33f,.65f),18*Unit);
+        SurfaceBox(rangeOrigin,rangeOrigin+new Vector2(rangeWidth,36*Unit),Surface2,Border,6*Unit);
         RangePosition=motion.Approach("range-position",rangeChoice,18);
         var indicatorStart=rangeOrigin+new Vector2(3*Unit+RangePosition*(rangeWidth-6*Unit)/3,3*Unit);
-        SurfaceBox(indicatorStart,indicatorStart+new Vector2((rangeWidth-6*Unit)/3,30*Unit),new(.27f,.22f,.38f,1),new(.62f,.47f,.80f,.65f),15*Unit);
+        SurfaceBox(indicatorStart,indicatorStart+new Vector2((rangeWidth-6*Unit)/3,30*Unit),Surface,Border,4*Unit);
         for(var i=0;i<3;i++) {
             var start=rangeOrigin+new Vector2(3*Unit+i*(rangeWidth-6*Unit)/3,3*Unit);var size=new Vector2((rangeWidth-6*Unit)/3,30*Unit);
             ImGui.SetCursorScreenPos(start);
+            HitRegions["range-"+i]=new(start.X,start.Y,start.X+size.X,start.Y+size.Y);
             if(ImGui.InvisibleButton("range-"+i,size)){rangeChoice=i;source=null;Refresh();}
             var hover=motion.Approach("range-hover-"+i,ImGui.IsItemHovered()?1:0,18);
             if(i!=rangeChoice&&hover>.001f)ImGui.GetWindowDrawList().AddRectFilled(start,start+size,Color(Surface2 with {W=hover}),15*Unit);
             if(ImGui.IsItemHovered())ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
-            var text=new[]{"最近 7 天","最近 14 天","最近 30 天"}[i];
+            var text=new[]{"当月","当年","所有"}[i];
             ImGui.GetWindowDrawList().AddText(start+(size-ImGui.CalcTextSize(text))/2,Color(i==rangeChoice?Ink:Muted),text);
         }
         ImGui.SetCursorScreenPos(rangeOrigin);ImGui.Dummy(new(rangeWidth,36*Unit));
         var wide=ImGui.GetContentRegionAvail().X>680*Unit;
         var chartWidth=wide?(ImGui.GetContentRegionAvail().X-gap)*.60f:ImGui.GetContentRegionAvail().X;
-        var chartHeight=(trend.All(t=>t.Income==0&&t.Expense==0)?205:285)*Unit;
+        var chartHeight=(trend.All(t=>t.Income==0&&t.Expense==0)?220:315)*Unit;
         if(Panel("trend-panel",new(chartWidth,chartHeight))) {
-            ImGui.TextUnformatted("收支趋势");ImGui.SameLine();ImGui.TextColored(Muted,$"最近 {TrendDays} 天");
+            ImGui.TextUnformatted("收支趋势");ImGui.SameLine();ImGui.TextColored(Muted,PeriodLabel);
             if(trend.All(t=>t.Income==0&&t.Expense==0)) Empty("等待第一笔金币流动","有收入或支出后，这里会自动展示每日趋势。",125);
             else DrawTrend();
         }EndPanel();
         if(wide)ImGui.SameLine(0,gap);
         if(Panel("categories",new(wide?ImGui.GetContentRegionAvail().X:-1,chartHeight))) {
-            ImGui.TextUnformatted("支出去向");ImGui.SameLine();ImGui.TextColored(Muted,"本月");
-            if(groups.Length==0)Empty("本月还没有支出","每一笔开销，都会在这里找到去向。",125);
+            ImGui.TextUnformatted("支出去向");ImGui.SameLine();ImGui.TextColored(Muted,PeriodLabel);
+            if(groups.Length==0)Empty("此范围还没有支出","每一笔开销，都会在这里找到去向。",125);
             else DrawCategories();
         }EndPanel();
-        if(Panel("recent",new(-1,plugin.Entries.Length==0?115*Unit:165*Unit))) {
+        if(Panel("recent",new(-1,plugin.Entries.Length==0?130*Unit:210*Unit))) {
+            var recentTitle=ImGui.GetCursorScreenPos();HitRegions["recent-title"]=new(recentTitle.X,recentTitle.Y,recentTitle.X+80*Unit,recentTitle.Y+17*Unit);
             ImGui.TextUnformatted("最近流水");ImGui.SameLine();if(ImGui.SmallButton("查看全部"))Navigate(1);
             if(plugin.Entries.Length==0){ImGui.Spacing();ImGui.TextColored(Muted,"账本已就绪，无需手动记账。");ImGui.TextColored(Muted,"下一次传送、购物或领取金币后，流水会自动出现在这里。");}
             else foreach(var e in plugin.Entries.Take(3)) {
@@ -283,7 +266,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
     }
     private void Metric(string id,string title,string value,string subtitle,Vector4 color,float width) {
         var origin=ImGui.GetCursorScreenPos();var size=new Vector2(width,82*Unit);
-        SurfaceBox(origin,origin+size,new(.105f,.105f,.145f,.98f),new(.26f,.24f,.34f,.8f),10*Unit);
+        SurfaceBox(origin,origin+size,Surface,Border,10*Unit);
         var draw=ImGui.GetWindowDrawList();
         draw.AddCircleFilled(origin+new Vector2(17,20)*Unit,3*Unit,Color(color));
         draw.AddText(origin+new Vector2(29,11)*Unit,Color(Muted),title);
@@ -305,27 +288,28 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         ImGui.Dummy(new(1,Math.Max(0,height-112)*Unit));
     }
     private void DrawCategories() {
-        // Keep the largest three categories and aggregate the remainder, so the whole ring is accounted for.
-        var slices=groups.Take(3).Select(g=>(Label:g.Category.Label(),g.Amount)).ToList();
-        if(groups.Length>3)slices.Add(("其他",groups.Skip(3).Sum(g=>g.Amount)));
-        Vector4[] colors=[Green,Gold,new(.39f,.58f,.69f,1),new(.69f,.63f,.77f,1)];
-        var draw=ImGui.GetWindowDrawList();var origin=ImGui.GetCursorScreenPos();
-        var center=origin+new Vector2(ImGui.GetContentRegionAvail().X/2,49*Unit);
-        var outer=42*Unit;var inner=31*Unit;double angle=-Math.PI/2;
-        for(var i=0;i<slices.Count;i++) {
-            var sweep=2*Math.PI*slices[i].Amount/monthTotal.Expense;
-            draw.PathArcTo(center,(outer+inner)/2,(float)angle,(float)(angle+sweep),Math.Max(4,(int)Math.Ceiling(sweep*24)));
-            draw.PathStroke(Color(colors[i]),ImDrawFlags.None,outer-inner);
-            angle+=sweep;
+        Vector4[] colors=[Accent,new(.36f,.49f,.39f,1),Gold,new(.34f,.43f,.44f,1),new(.47f,.39f,.29f,1)];
+        var origin=ImGui.GetCursorScreenPos();var size=new Vector2(ImGui.GetContentRegionAvail().X,185*Unit);
+        var total=groups.Sum(g=>g.Amount);var draw=ImGui.GetWindowDrawList();
+        foreach(var cell in Treemap.Layout(groups.Select(g=>g.Amount).ToArray(),size.X,size.Y)) {
+            var p=origin+new Vector2((float)cell.X,(float)cell.Y);var end=p+new Vector2((float)cell.Width,(float)cell.Height);
+            var g=groups[cell.Index];var fill=colors[cell.Index%colors.Length];
+            draw.AddRectFilled(p,end,Color(fill),2*Unit);
+            draw.AddRect(p,end,Color(Surface),0,ImDrawFlags.None,2*Unit);
+            draw.PushClipRect(p+new Vector2(5*Unit),end-new Vector2(5*Unit),true);
+            var label=g.Category.Label();
+            if(cell.Width>ImGui.CalcTextSize(label).X+16*Unit&&cell.Height>28*Unit)draw.AddText(p+new Vector2(10,10)*Unit,Color(new(1,1,.97f,1)),label);
+            if(cell.Width>90*Unit&&cell.Height>70*Unit){draw.AddText(p+new Vector2(10,36)*Unit,Color(new(1,1,.97f,1)),Money(g.Amount));draw.AddText(p+new Vector2(10,60)*Unit,Color(new(1,1,.97f,.8f)),((double)g.Amount/total).ToString("P1"));}
+            draw.PopClipRect();
         }
-        var label="支出占比";draw.AddText(center-ImGui.CalcTextSize(label)/2,Color(Muted),label);
-        ImGui.Dummy(new(1,100*Unit));
-        for(var i=0;i<slices.Count;i++) {
-            var item=slices[i];var pos=ImGui.GetCursorScreenPos();draw.AddCircleFilled(pos+new Vector2(4,8)*Unit,3*Unit,Color(colors[i]));
-            ImGui.Indent(14*Unit);ImGui.TextUnformatted(item.Label);ImGui.SameLine();
-            ImGui.TextColored(Muted,$"{(double)item.Amount/monthTotal.Expense:P0} · {Money(item.Amount)}");ImGui.Unindent(14*Unit);
+        ImGui.InvisibleButton("spending-treemap",size);
+        if(ImGui.IsItemHovered()) {
+            var mouse=ImGui.GetMousePos()-origin;
+            foreach(var c in Treemap.Layout(groups.Select(g=>g.Amount).ToArray(),size.X,size.Y))if(mouse.X>=c.X&&mouse.X<c.X+c.Width&&mouse.Y>=c.Y&&mouse.Y<c.Y+c.Height) {
+                var g=groups[c.Index];Tooltip($"{g.Category.Label()}\n支出 {Money(g.Amount)} GIL · {(double)g.Amount/total:P1}");break;
+            }
         }
-        if(groups.Length>3&&ImGui.SmallButton("查看分类流水"))Navigate(1);
+        ImGui.TextColored(Muted,"矩形面积代表金额 · 悬停查看明细");
     }
     private void DrawTrend() {
         var income=trend.Max(t=>t.Income);var expense=trend.Max(t=>t.Expense);
@@ -335,7 +319,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         ImGui.TextColored(Muted,split?"量级差异较大 · 上下图独立刻度（GIL）":income==0?"仅支出 · 金额（GIL）":expense==0?"仅收入 · 金额（GIL）":"同一刻度 · 金额（GIL）");
         var origin=ImGui.GetCursorScreenPos();var size=new Vector2(ImGui.GetContentRegionAvail().X,185*Unit);
         var draw=ImGui.GetWindowDrawList();var left=70*Unit;var plotWidth=Math.Max(1,size.X-left-12*Unit);
-        var step=plotWidth/(trend.Length-1);
+        var step=plotWidth/Math.Max(1,trend.Length-1);
         void Lane(float top,float height,long max,bool showIncome,bool showExpense) {
             var baseline=origin.Y+top+height;var peak=origin.Y+top+8*Unit;
             for(var row=0;row<3;row++) {
@@ -357,15 +341,16 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         }
         if(split){Lane(0,67*Unit,income,true,false);Lane(88*Unit,67*Unit,expense,false,true);}
         else Lane(0,155*Unit,Math.Max(income,expense),income>0,expense>0);
-        foreach(var i in new[]{0,(trend.Length-1)/3,(trend.Length-1)*2/3,trend.Length-1}) {
-            var label=day.AddDays(i-(trend.Length-1)).ToString("MM/dd");
+        foreach(var i in new[]{0,(trend.Length-1)/3,(trend.Length-1)*2/3,trend.Length-1}.Distinct()) {
+            var yearly=rangeChoice==2&&bucketDates.Length>1&&bucketDates[1].Year>bucketDates[0].Year;
+            var label=bucketDates[i].ToString(rangeChoice==0?"MM/dd":yearly?"yyyy":"yy/MM");
             draw.AddText(new(origin.X+left+i*step-ImGui.CalcTextSize(label).X/2,origin.Y+164*Unit),Color(Muted),label);
         }
         ImGui.InvisibleButton("trend-hit",size);
         if(ImGui.IsItemHovered()&&ImGui.GetMousePos().X>=origin.X+left) {
             var i=Math.Clamp((int)Math.Round((ImGui.GetMousePos().X-origin.X-left)/step),0,trend.Length-1);
             if(trend[i].Income!=0||trend[i].Expense!=0) {
-                Tooltip($"{day.AddDays(i-(trend.Length-1)):yyyy-MM-dd}\n收入  {Money(trend[i].Income)} GIL\n支出  {Money(trend[i].Expense)} GIL");
+                Tooltip($"{bucketDates[i]:yyyy-MM-dd}\n收入  {Money(trend[i].Income)} GIL\n支出  {Money(trend[i].Expense)} GIL");
             }
         }
     }
@@ -425,7 +410,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         BeginSettingsCard("记账偏好"); {
             var transfers=plugin.Config.ExcludeTransfers;if(ToggleRow("transfers","统计排除资金转移","只排除已识别的雇员及部队转账，普通交易仍保留。",ref transfers)){plugin.Config.ExcludeTransfers=transfers;plugin.SaveConfig();}
             var experimental=plugin.Config.EnableExperimentalClassification;if(ToggleRow("classification","交互窗口辅助分类","实验性：根据商店、修理等窗口推断用途，可能误判。",ref experimental)){plugin.Config.EnableExperimentalClassification=experimental;plugin.SaveConfig();}
-            ImGui.PushTextWrapPos(0);ImGui.TextColored(Muted,"市场确认与系统消息始终参与金额匹配；此开关仅控制商店、修理等窗口推断。缺少证据时保留未分类。");ImGui.PopTextWrapPos();
+            ImGui.PushTextWrapPos(0);ImGui.TextColored(Muted,"市场确认、传送核对与系统消息始终参与金额匹配；此开关仅控制商店、修理等窗口推断。缺少证据时保留未分类。");ImGui.PopTextWrapPos();
             var scale=plugin.Config.Scale;ImGui.SetNextItemWidth(210*Unit);if(ImGui.SliderFloat("界面缩放",ref scale,.8f,1.6f,"%.2f")){plugin.Config.Scale=scale;plugin.SaveConfig();}
         }EndSettingsCard();
         BeginSettingsCard("本地数据"); {ImGui.TextWrapped(plugin.DataDirectory);

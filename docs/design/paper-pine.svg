@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1080" viewBox="0 0 1440 1080"><style>text{font-family:Microsoft YaHei,Noto Sans CJK SC,sans-serif;fill:#243835} .muted{fill:#66756e}</style>
+<rect x="0" y="0" width="1440" height="1080" rx="0" fill="#e5e9df" stroke="none"/>
+<text x="42" y="53" font-size="26" fill="#243835" style="fill:#243835">金币账本 / PAPER &amp; PINE</text>
+<text x="42" y="84" font-size="15" fill="#66756e" style="fill:#66756e">独立视觉设计 · 原生 ImGui 实现规范 · 2026.10</text>
+<rect x="42" y="116" width="1040" height="900" rx="8" fill="#f2f0e6" stroke="#cdd3c5"/>
+<rect x="42" y="116" width="1040" height="96" rx="8" fill="#fefcf6" stroke="none"/>
+<text x="66" y="149" font-size="17" fill="#98632b" style="fill:#98632b">▤  金币账本</text>
+<text x="210" y="149" font-size="14" fill="#287259" style="fill:#287259">● 记录中</text>
+<text x="1006" y="149" font-size="22" fill="#243835" style="fill:#243835">⌄    ×</text>
+<text x="90" y="193" font-size="15" fill="#296457" style="fill:#296457">资产概览</text>
+<text x="214" y="193" font-size="15" fill="#66756e" style="fill:#66756e">收支流水</text>
+<text x="338" y="193" font-size="15" fill="#66756e" style="fill:#66756e">偏好与数据</text>
+<path d="M66,209L166,209" stroke="#296457" stroke-width="3" fill="none"/>
+<path d="M42,212L1082,212" stroke="#d1d4c7" stroke-width="1" fill="none"/>
+<text x="68" y="248" font-size="14" fill="#296457" style="fill:#296457">资产概览</text>
+<text x="68" y="294" font-size="34" fill="#243835" style="fill:#243835">1,518,170</text>
+<text x="245" y="285" font-size="14" fill="#98632b" style="fill:#98632b">GIL</text>
+<text x="68" y="324" font-size="14" fill="#66756e" style="fill:#66756e">随身余额 / GIL · 自动记账</text>
+<text x="970" y="273" font-size="14" fill="#243835" style="fill:#243835">示例角色</text>
+<text x="862" y="304" font-size="14" fill="#66756e" style="fill:#66756e">雇员销售款提取后入账</text>
+<rect x="68" y="354" width="313" height="82" rx="6" fill="#fefcf6" stroke="#d1d4c7"/>
+<text x="83" y="380" font-size="14" fill="#217357" style="fill:#217357">●  今日收入</text>
+<text x="83" y="415" font-size="23" fill="#243835" style="fill:#243835">+ 2,800</text>
+<text x="273" y="423" font-size="12" fill="#66756e" style="fill:#66756e">本月 17,300</text>
+<rect x="394" y="354" width="313" height="82" rx="6" fill="#fefcf6" stroke="#d1d4c7"/>
+<text x="409" y="380" font-size="14" fill="#b84a38" style="fill:#b84a38">●  今日支出</text>
+<text x="409" y="415" font-size="23" fill="#243835" style="fill:#243835">− 0</text>
+<text x="599" y="423" font-size="12" fill="#66756e" style="fill:#66756e">本月 19,100</text>
+<rect x="720" y="354" width="313" height="82" rx="6" fill="#fefcf6" stroke="#d1d4c7"/>
+<text x="735" y="380" font-size="14" fill="#243835" style="fill:#243835">●  本月结余</text>
+<text x="735" y="415" font-size="23" fill="#243835" style="fill:#243835">− 1,800</text>
+<text x="925" y="423" font-size="12" fill="#66756e" style="fill:#66756e">收入减去支出</text>
+<rect x="68" y="458" width="300" height="36" rx="6" fill="#e3e8d9" stroke="none"/>
+<rect x="71" y="461" width="96" height="30" rx="4" fill="#fefcf6" stroke="#d1d4c7"/>
+<text x="106" y="483" font-size="14" fill="#243835" style="fill:#243835">当月</text>
+<text x="206" y="483" font-size="14" fill="#243835" style="fill:#243835">当年</text>
+<text x="306" y="483" font-size="14" fill="#243835" style="fill:#243835">所有</text>
+<rect x="68" y="508" width="571" height="315" rx="6" fill="#fefcf6" stroke="#d1d4c7"/>
+<rect x="653" y="508" width="380" height="315" rx="6" fill="#fefcf6" stroke="#d1d4c7"/>
+<text x="84" y="537" font-size="16" fill="#243835" style="fill:#243835">收支趋势</text>
+<text x="167" y="537" font-size="14" fill="#66756e" style="fill:#66756e">当月</text>
+<text x="84" y="564" font-size="14" fill="#217357" style="fill:#217357">收入</text>
+<text x="126" y="564" font-size="14" fill="#b84a38" style="fill:#b84a38">支出</text>
+<text x="84" y="588" font-size="13" fill="#66756e" style="fill:#66756e">同一刻度 · 金额（GIL）</text>
+<path d="M155,611L620,611" stroke="#d1d4c7" stroke-width="1" fill="none"/>
+<text x="84" y="616" font-size="13" fill="#66756e" style="fill:#66756e">4,120</text>
+<path d="M155,680L620,680" stroke="#d1d4c7" stroke-width="1" fill="none"/>
+<text x="84" y="685" font-size="13" fill="#66756e" style="fill:#66756e">2,060</text>
+<path d="M155,750L620,750" stroke="#d1d4c7" stroke-width="1" fill="none"/>
+<text x="84" y="755" font-size="13" fill="#66756e" style="fill:#66756e">0</text>
+<polyline points="155,750 374,750 389,612 404,750 434,624 449,750 480,640 495,750 525,655 540,750 570,650 585,750 615,662" stroke="#217357" stroke-width="2" fill="none"/>
+<polyline points="155,750 359,750 374,666 389,750 404,670 419,750 450,680 480,684 495,750 525,688 555,692 585,750 615,750" stroke="#b84a38" stroke-width="2" fill="none"/>
+<text x="145" y="774" font-size="13" fill="#66756e" style="fill:#66756e">10/01</text>
+<text x="290" y="774" font-size="13" fill="#66756e" style="fill:#66756e">10/11</text>
+<text x="450" y="774" font-size="13" fill="#66756e" style="fill:#66756e">10/21</text>
+<text x="587" y="774" font-size="13" fill="#66756e" style="fill:#66756e">10/31</text>
+<text x="670" y="537" font-size="16" fill="#243835" style="fill:#243835">支出去向</text>
+<text x="752" y="537" font-size="14" fill="#66756e" style="fill:#66756e">当月</text>
+<rect x="670" y="550" width="196" height="183" rx="2" fill="#296457" stroke="none"/>
+<rect x="869" y="550" width="148" height="183" rx="2" fill="#5c7d63" stroke="none"/>
+<text x="680" y="574" font-size="14" fill="#fffdf7" style="fill:#fffdf7">传送</text>
+<text x="680" y="602" font-size="14" fill="#fffdf7" style="fill:#fffdf7">10,860</text>
+<text x="680" y="628" font-size="14" fill="#fffdf7" style="fill:#fffdf7">56.9%</text>
+<text x="879" y="574" font-size="14" fill="#fffdf7" style="fill:#fffdf7">市场购买</text>
+<text x="879" y="602" font-size="14" fill="#fffdf7" style="fill:#fffdf7">8,240</text>
+<text x="879" y="628" font-size="14" fill="#fffdf7" style="fill:#fffdf7">43.1%</text>
+<text x="670" y="765" font-size="12" fill="#66756e" style="fill:#66756e">矩形面积代表金额 · 悬停查看明细</text>
+<rect x="68" y="837" width="965" height="170" rx="6" fill="#fefcf6" stroke="#d1d4c7"/>
+<text x="84" y="866" font-size="15" fill="#243835" style="fill:#243835">最近流水</text>
+<rect x="170" y="850" width="80" height="23" rx="4" fill="#e3e8d9" stroke="none"/>
+<text x="180" y="866" font-size="13" fill="#243835" style="fill:#243835">查看全部</text>
+<path d="M84,886L1017,886" stroke="#d1d4c7" stroke-width="1" fill="none"/>
+<text x="88" y="911" font-size="14" fill="#243835" style="fill:#243835">任务奖励</text>
+<text x="300" y="911" font-size="13" fill="#66756e" style="fill:#66756e">10/31 12:40 · 利姆萨·罗敏萨</text>
+<text x="943" y="911" font-size="14" fill="#217357" style="fill:#217357">+ 2,800</text>
+<path d="M84,924L1017,924" stroke="#d1d4c7" stroke-width="1" fill="none"/>
+<text x="88" y="949" font-size="14" fill="#243835" style="fill:#243835">传送</text>
+<text x="300" y="949" font-size="13" fill="#66756e" style="fill:#66756e">10/31 12:40 · 利姆萨·罗敏萨</text>
+<text x="943" y="949" font-size="14" fill="#b84a38" style="fill:#b84a38">− 1,660</text>
+<path d="M84,962L1017,962" stroke="#d1d4c7" stroke-width="1" fill="none"/>
+<text x="88" y="987" font-size="14" fill="#243835" style="fill:#243835">市场购买</text>
+<text x="300" y="987" font-size="13" fill="#66756e" style="fill:#66756e">10/31 12:40 · 利姆萨·罗敏萨</text>
+<text x="943" y="987" font-size="14" fill="#b84a38" style="fill:#b84a38">− 1,740</text>
+<text x="1112" y="145" font-size="20" fill="#243835" style="fill:#243835">视觉语言</text>
+<rect x="1112" y="180" width="32" height="32" rx="4" fill="#f2f0e6" stroke="#cdd3c5"/>
+<text x="1154" y="193" font-size="13" fill="#243835" style="fill:#243835">纸白 / Canvas</text>
+<text x="1154" y="211" font-size="12" fill="#66756e" style="fill:#66756e">#f2f0e6</text>
+<rect x="1112" y="229" width="32" height="32" rx="4" fill="#fefcf6" stroke="#cdd3c5"/>
+<text x="1154" y="242" font-size="13" fill="#243835" style="fill:#243835">卡片 / Surface</text>
+<text x="1154" y="260" font-size="12" fill="#66756e" style="fill:#66756e">#fefcf6</text>
+<rect x="1112" y="278" width="32" height="32" rx="4" fill="#296457" stroke="#cdd3c5"/>
+<text x="1154" y="291" font-size="13" fill="#243835" style="fill:#243835">墨绿 / Accent</text>
+<text x="1154" y="309" font-size="12" fill="#66756e" style="fill:#66756e">#296457</text>
+<rect x="1112" y="327" width="32" height="32" rx="4" fill="#98632b" stroke="#cdd3c5"/>
+<text x="1154" y="340" font-size="13" fill="#243835" style="fill:#243835">铜金 / Gold</text>
+<text x="1154" y="358" font-size="12" fill="#66756e" style="fill:#66756e">#98632b</text>
+<rect x="1112" y="376" width="32" height="32" rx="4" fill="#217357" stroke="#cdd3c5"/>
+<text x="1154" y="389" font-size="13" fill="#243835" style="fill:#243835">收入 / Income</text>
+<text x="1154" y="407" font-size="12" fill="#66756e" style="fill:#66756e">#217357</text>
+<rect x="1112" y="425" width="32" height="32" rx="4" fill="#b84a38" stroke="#cdd3c5"/>
+<text x="1154" y="438" font-size="13" fill="#243835" style="fill:#243835">支出 / Expense</text>
+<text x="1154" y="456" font-size="12" fill="#66756e" style="fill:#66756e">#b84a38</text>
+<text x="1112" y="530" font-size="20" fill="#243835" style="fill:#243835">结构与交互</text>
+<text x="1112" y="563" font-size="13" fill="#66756e" style="fill:#66756e">顶部文字导航 / 下划线过渡</text>
+<text x="1112" y="592" font-size="13" fill="#66756e" style="fill:#66756e">无光晕 / 无图标导航轨</text>
+<text x="1112" y="621" font-size="13" fill="#66756e" style="fill:#66756e">平面纸张表面 / 细线边界</text>
+<text x="1112" y="650" font-size="13" fill="#66756e" style="fill:#66756e">圆角 6px / 间距 12–26px</text>
+<text x="1112" y="679" font-size="13" fill="#66756e" style="fill:#66756e">金额使用独立烘焙字体</text>
+<text x="1112" y="708" font-size="13" fill="#66756e" style="fill:#66756e">260ms 切页 / 280ms 折叠</text>
+<text x="1112" y="737" font-size="13" fill="#66756e" style="fill:#66756e">减少动态效果 → 即时完成</text>
+<text x="1112" y="766" font-size="13" fill="#66756e" style="fill:#66756e">卡片随外层视口统一裁切</text>
+<text x="1112" y="850" font-size="20" fill="#243835" style="fill:#243835">图表规范</text>
+<text x="1112" y="883" font-size="13" fill="#66756e" style="fill:#66756e">趋势：当月按日 / 当年按月</text>
+<text x="1112" y="910" font-size="13" fill="#66756e" style="fill:#66756e">所有：按月，长历史按年</text>
+<text x="1112" y="937" font-size="13" fill="#66756e" style="fill:#66756e">单边收支隐藏空系列</text>
+<text x="1112" y="964" font-size="13" fill="#66756e" style="fill:#66756e">量级差异 ≥8 倍：双图标注</text>
+<text x="1112" y="991" font-size="13" fill="#66756e" style="fill:#66756e">树图保留全部类别和准确金额</text>
+<text x="42" y="1038" font-size="14" fill="#66756e" style="fill:#66756e">可编辑 SVG 矢量设计板。示例数据仅用于设计；实际截图见同目录 preview.png。字体由系统提供。</text>
+</svg>
