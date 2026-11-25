@@ -30,6 +30,31 @@ public sealed class LedgerTests
         e.Observe(S(600,6));e.AddEvidence(new("3",1,T.AddSeconds(6),-100,Category.Teleport,"","a"));e.AddEvidence(new("4",1,T.AddSeconds(6),-200,Category.Repair,"","b"));
         Assert.Equal(Category.Unknown,Assert.Single(Entries(e.Flush(T.AddSeconds(10)))).Category);
     }
+    [Fact] public void ConfirmedPurchaseKeepsItemDetailsAndIgnoresConflictingWindowHint() {
+        var engine = new LedgerEngine();
+        engine.Observe(S(1000));
+        var time = T.AddSeconds(1);
+        engine.AddEvidence(new("window", 1, time, -125, Category.PlayerTrade, "", "", IsContextHint: true));
+        engine.AddEvidence(new("chat", 1, time, -125, Category.MarketPurchase, "", ""));
+        engine.AddEvidence(new("market", 1, time, -125, Category.MarketPurchase, "", "", 42, "测试物品", 2));
+        engine.Observe(S(875, 1));
+        var entry = Assert.Single(Entries(engine.Flush(T.AddSeconds(4))));
+        Assert.Equal(Category.MarketPurchase, entry.Category);
+        Assert.Equal(42u, entry.ItemId);
+        Assert.Equal(2u, entry.Quantity);
+    }
+    [Theory]
+    [InlineData(Category.QuestReward)]
+    [InlineData(Category.DutyReward)]
+    public void ConfirmedRewardOverridesGenericGilNotice(Category category) {
+        var engine = new LedgerEngine();
+        engine.Observe(S(1000));
+        var time = T.AddSeconds(1);
+        engine.AddEvidence(new("gil", 1, time, 200, Category.SystemReward, "", ""));
+        engine.AddEvidence(new("completion", 1, time, 200, category, "", ""));
+        engine.Observe(S(1200, 1));
+        Assert.Equal(category, Assert.Single(Entries(engine.Flush(T.AddSeconds(4)))).Category);
+    }
     [Fact] public void EqualAdjacentAmountsCannotStealOneEvidence() {
         var e=new LedgerEngine();e.Observe(S(1000));e.Observe(S(900,1));e.Observe(S(800,2));e.AddEvidence(new("1",1,T.AddSeconds(1),-100,Category.Repair,"","a"));
         var entries=Entries(e.Flush(T.AddSeconds(10)));Assert.Equal(2,entries.Length);Assert.All(entries,x=>Assert.Equal(Category.Unknown,x.Category));
@@ -79,19 +104,6 @@ public sealed class LedgerTests
             var bad=Path.Combine(path,"invalid.sqlite");await File.WriteAllTextAsync(bad,"broken");await Assert.ThrowsAnyAsync<Exception>(()=>store.RestoreAsync(bad));Assert.Single(await store.LoadEntriesAsync(1));
         } finally {Directory.Delete(path,true);}
     }
-    [Fact] public async Task FailedWriteCannotAdvanceLaterCheckpoints() {
-        var path=Path.Combine(Path.GetTempPath(),"JiZhang-tests-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(path);
-        try {using var store=new LedgerStore(Path.Combine(path,"ledger.sqlite"));await store.SaveAsync(new(S(1000),[]));
-            // Inject an actual SQLite write failure without requiring filesystem-specific permissions.
-            using(var db=new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Path.Combine(path,"ledger.sqlite")};Pooling=False")) {
-                db.Open();using var cmd=db.CreateCommand();cmd.CommandText="CREATE TRIGGER reject_entries BEFORE INSERT ON entries BEGIN SELECT RAISE(ABORT,'simulated full disk'); END;";cmd.ExecuteNonQuery();
-            }
-            var entry=new LedgerEntry("failed",1,"角色",T,1000,900,new(1,"test"));
-            await Assert.ThrowsAnyAsync<Exception>(()=>store.SaveAsync(new(S(900),[entry])));
-            await Assert.ThrowsAsync<IOException>(()=>store.SaveAsync(new(S(800),[])));
-            Assert.Equal(1000,Assert.Single(await store.LoadStatesAsync()).Balance);Assert.Empty(await store.LoadEntriesAsync(1));Assert.NotNull(store.LastError);
-        } finally {Directory.Delete(path,true);}
-    }
     [Theory]
     [InlineData("states", "{")]
     [InlineData("entries", "{")]
@@ -124,4 +136,18 @@ public sealed class LedgerTests
             Assert.Equal(entry, Assert.Single(await reopened.LoadEntriesAsync(1)));
         } finally { Directory.Delete(root, true); }
     }
+    [Fact] public async Task FailedWriteCannotAdvanceLaterCheckpoints() {
+        var path=Path.Combine(Path.GetTempPath(),"JiZhang-tests-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(path);
+        try {using var store=new LedgerStore(Path.Combine(path,"ledger.sqlite"));await store.SaveAsync(new(S(1000),[]));
+            // Inject an actual SQLite write failure without requiring filesystem-specific permissions.
+            using(var db=new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Path.Combine(path,"ledger.sqlite")};Pooling=False")) {
+                db.Open();using var cmd=db.CreateCommand();cmd.CommandText="CREATE TRIGGER reject_entries BEFORE INSERT ON entries BEGIN SELECT RAISE(ABORT,'simulated full disk'); END;";cmd.ExecuteNonQuery();
+            }
+            var entry=new LedgerEntry("failed",1,"角色",T,1000,900,new(1,"test"));
+            await Assert.ThrowsAnyAsync<Exception>(()=>store.SaveAsync(new(S(900),[entry])));
+            await Assert.ThrowsAsync<IOException>(()=>store.SaveAsync(new(S(800),[])));
+            Assert.Equal(1000,Assert.Single(await store.LoadStatesAsync()).Balance);Assert.Empty(await store.LoadEntriesAsync(1));Assert.NotNull(store.LastError);
+        } finally {Directory.Delete(path,true);}
+    }
+
 }

@@ -23,6 +23,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
     [PluginService] internal static IDataManager Data { get; private set; } = null!;
     [PluginService] internal static IChatGui Chat { get; private set; } = null!;
     [PluginService] internal static IMarketBoard Market { get; private set; } = null!;
+    [PluginService] internal static IDutyState Duty { get; private set; } = null!;
     [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     internal Configuration Config { get; }
@@ -64,6 +65,8 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
         Interface.UiBuilder.OpenConfigUi += Open;
         Framework.Update += Update;
         Chat.ChatMessage += OnChat;
+        Chat.LogMessage += OnLogMessage;
+        Duty.DutyCompleted += OnDutyCompleted;
         Market.PurchaseRequested += OnMarketRequest;
         Market.ItemPurchased += OnMarketPurchase;
         StartTeleportAdapter();
@@ -92,7 +95,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
             // Zoning may temporarily unload player state; an in-flight request keeps its baseline.
             if(Client.IsLoggedIn&&teleport.Pending&&(!Player.IsLoaded||Player.ContentId==0))return;
             if (!Client.IsLoggedIn || !Player.IsLoaded || Player.ContentId == 0) {
-                Save(engine.Suspend(DateTimeOffset.UtcNow)); Current = null; activeCharacter = 0; teleport.Reset(); systemMessages.Reset(); Status = "等待角色登录"; return;
+                Save(engine.Suspend(DateTimeOffset.UtcNow)); Current = null; activeCharacter = 0; teleport.Reset(); ResetGilEvidence(); Status = "等待角色登录"; return;
             }
             var manager = InventoryManager.Instance();
             if (manager == null) { if(!teleport.Pending)Save(engine.Suspend(DateTimeOffset.UtcNow)); return; }
@@ -110,6 +113,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
             // Evidence must arrive before Observe flushes mature debits. Arrival uses the actual area,
             // while the entry stores the request's departure snapshot.
             var delta=old?.CharacterId==sample.CharacterId?sample.Balance-old.Balance:0;
+            SampleTrade(manager, sample);
             var departure=teleport.Departure;
             var teleportEvidence=teleport.Observe(sample with {Location=location},delta);
             if(teleportEvidence!=null)engine.AddEvidence(teleportEvidence);
@@ -152,7 +156,8 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
         if (Visible("Repair") && amount < 0) hints.Add(Category.Repair);
         if (Visible("Shop")) hints.Add(amount < 0 ? Category.NpcPurchase : Category.NpcSale);
         if (hints.Count != 1) return;
-        engine!.AddEvidence(new(Guid.NewGuid().ToString("N"), sample.CharacterId, sample.Time, amount, hints[0], "交易发生时存在对应交互窗口；未验证的上下文推断。", "交互上下文（实验性，可能误判）"));
+        engine!.AddEvidence(new(Guid.NewGuid().ToString("N"), sample.CharacterId, sample.Time, amount, hints[0],
+            "交易发生时存在对应交互窗口。", "交互上下文（实验性，可能误判）", IsContextHint: true));
     }
     private void OnChat(IHandleableChatMessage message) {
         var type = (XivChatType)message.LogKind;
@@ -166,23 +171,21 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
         if (e != null) incoming.Enqueue(e);
     }
     private void OnMarketRequest(IMarketBoardPurchaseHandler p) {
-        lock (marketLock) request = new(activeCharacter, DateTimeOffset.UtcNow, p.CatalogId, p.ItemQuantity, checked((long)p.PricePerUnit * p.ItemQuantity + p.TotalTax));
+        var character = activeCharacter;
+        var cost = (ulong)p.PricePerUnit * p.ItemQuantity + p.TotalTax;
+        if (character == 0 || cost is 0 or > 999999999) return;
+        lock (marketLock) request = new(character, DateTimeOffset.UtcNow, p.CatalogId % 1000000, p.ItemQuantity, (long)cost);
     }
     private void OnMarketPurchase(IMarketBoardPurchase p) {
         lock (marketLock) {
-            var r = request; request = null;
-            if (r == null || r.Character == 0 || r.Character != activeCharacter || r.Item != p.CatalogId || r.Quantity != p.ItemQuantity || DateTimeOffset.UtcNow - r.Time > TimeSpan.FromMinutes(2)) return;
-            incoming.Enqueue(new(Guid.NewGuid().ToString("N"), r.Character, DateTimeOffset.UtcNow, -r.Cost, Category.MarketPurchase,
-                "市场购买确认，与含税金额核对。", "市场确认事件（待国服实测）", r.Item, Quantity: r.Quantity));
+            MatchMarketPurchase(activeCharacter, DateTimeOffset.UtcNow, p.CatalogId, p.ItemQuantity);
         }
     }
     internal void Restore(string path) => Framework.RunOnFrameworkThread(() => RestoreCore(path));
     private void RestoreCore(string path) {
         if (restoring || engine == null) return;
         Save(engine.Suspend(DateTimeOffset.UtcNow));
-        restoring = true; activeCharacter = 0; Current = null; teleport.Reset(); systemMessages.Reset();
-        while (incoming.TryDequeue(out _)) { }
-        lock (marketLock) request = null;
+        restoring = true; activeCharacter = 0; Current = null; teleport.Reset(); ResetGilEvidence();
         restoreStatus = "正在恢复备份…";
         restoreTask = Store.RestoreAsync(path);
     }
@@ -210,6 +213,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
         disposed = true;
         ticketTeleportHook?.Dispose(); teleportHook?.Dispose(); teleport.Reset(); systemMessages.Reset();
         Framework.Update -= Update; Chat.ChatMessage -= OnChat;
+        Chat.LogMessage -= OnLogMessage; Duty.DutyCompleted -= OnDutyCompleted;
         Market.PurchaseRequested -= OnMarketRequest; Market.ItemPurchased -= OnMarketPurchase;
         Interface.UiBuilder.Draw -= Draw; Interface.UiBuilder.OpenMainUi -= Open; Interface.UiBuilder.OpenConfigUi -= Open;
         Commands.RemoveHandler("/jizhang");

@@ -24,7 +24,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
     private bool exclude;
     private Totals todayTotal=new(0,0),monthTotal=new(0,0);
     private Totals[] trend=[];
-    private (Category Category,long Amount)[] groups=[];
+    private (Category Category, string Label, long Amount)[] groups=[];
     private int tabForPreview=-1;
     internal void SelectTab(int value) => tabForPreview=value;
     private float Unit => unit>0?unit:1;
@@ -256,7 +256,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
                 var row=ImGui.GetCursorScreenPos();var draw=ImGui.GetWindowDrawList();var rowWidth=ImGui.GetContentRegionAvail().X;
                 draw.AddCircleFilled(row+new Vector2(11,13)*Unit,11*Unit,Color((e.Amount>0?Green:Red) with {W=.10f}));
                 draw.AddText(row+new Vector2(6,4)*Unit,Color(e.Amount>0?Green:Red),e.Amount>0?"+":"-");
-                draw.AddText(row+new Vector2(34,4)*Unit,Color(Ink),e.Category.Label());
+                draw.AddText(row+new Vector2(34,4)*Unit,Color(Ink),e.CategoryLabel);
                 if(rowWidth>600*Unit) {
                     var amountWidth=ImGui.CalcTextSize(e.Amount.ToString("+#,0;-#,0;0")).X;
                     var textStart=row+new Vector2(170,4)*Unit;var textEnd=new Vector2(row.X+rowWidth-amountWidth-16*Unit,row.Y+26*Unit);
@@ -315,7 +315,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
             draw.AddRectFilled(p,end,Color(fill));
             draw.AddRect(p,end,Color(Surface),0,ImDrawFlags.None,Unit);
             if(cell.Width<=12*Unit||cell.Height<=12*Unit)continue;
-            var label=g.Category.Label();var width=(float)cell.Width-16*Unit;
+            var label=g.Label;var width=(float)cell.Width-16*Unit;
             while(label.Length>1&&ImGui.CalcTextSize(label).X>width)label=label[..^2]+"…";
             var lines=new List<string>();
             if(ImGui.CalcTextSize(label).X<=width&&cell.Height>30*Unit)lines.Add(label);
@@ -329,7 +329,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         }
         ImGui.InvisibleButton("spending-treemap",size);
         if(ImGui.IsItemHovered()&&hit is {} c) {
-            var g=groups[c.Index];Tooltip($"{g.Category.Label()}\n支出 {Money(g.Amount)} GIL · {(double)g.Amount/total:P1}");
+            var g=groups[c.Index];Tooltip($"{g.Label}\n支出 {Money(g.Amount)} GIL · {(double)g.Amount/total:P1}");
         }
         ImGui.TextColored(Muted,"面积代表支出金额 · 悬停查看明细");
     }
@@ -380,7 +380,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
     private void Transactions() {
         if(Panel("filters",new(-1,175*Unit))) {
             if(ImGui.BeginTable("filter-layout",2,ImGuiTableFlags.SizingStretchSame)) {
-                ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);if(ImGui.InputTextWithHint("##keyword","搜索用途、物品或角色",ref keyword,256))page=0;
+                ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);if(ImGui.InputTextWithHint("##keyword","搜索用途、物品、角色或标识",ref keyword,256))page=0;
                 ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);if(ImGui.InputTextWithHint("##place","筛选地点、传送起点或终点",ref location,128))page=0;
                 ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);if(ImGui.InputTextWithHint("##from","开始日期 YYYY-MM-DD",ref from,10))page=0;
                 ImGui.TableNextColumn();ImGui.SetNextItemWidth(-1);if(ImGui.InputTextWithHint("##to","结束日期 YYYY-MM-DD",ref to,10))page=0;
@@ -401,7 +401,7 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
         if(start>end){ImGui.TextColored(Red,"开始日期不能晚于结束日期");return;}
         var list=plugin.Entries.Where(e=>(start==null||e.Time.LocalDateTime.Date>=start)&&(end==null||e.Time.LocalDateTime.Date<=end)&&
             (direction==0||(direction==1?e.Amount>0:e.Amount<0))&&(category==null||e.Category==category)&&(e.Location.Name.Contains(location,StringComparison.OrdinalIgnoreCase)||(e.Destination?.Contains(location,StringComparison.OrdinalIgnoreCase)??false))&&
-            (keyword.Length==0||$"{e.Detail} {e.ItemName} {e.CharacterName} {e.Category.Label()}".Contains(keyword,StringComparison.OrdinalIgnoreCase))).ToArray();
+            (keyword.Length==0||$"{e.Detail} {e.ItemName} {e.CharacterName} {e.Category.Label()} {e.ExpenseCode}".Contains(keyword,StringComparison.OrdinalIgnoreCase))).ToArray();
         var totals=Totals.From(list,exclude);
         ImGui.TextColored(Muted,$"{list.Length:N0} 笔    收入 {Money(totals.Income)}    支出 {Money(totals.Expense)}");
         if(list.Length==0) {
@@ -416,13 +416,13 @@ internal sealed partial class LedgerView(ILedgerUiContext plugin)
                 if(date!=e.Time.LocalDateTime.Date){date=e.Time.LocalDateTime.Date;ImGui.TableNextRow();ImGui.TableNextColumn();ImGui.TextColored(Gold,date.Value.ToString("yyyy-MM-dd"));}
                 ImGui.TableNextRow(0,34*Unit);ImGui.TableNextColumn();
                 if(ImGui.Selectable(e.Time.LocalDateTime.ToString("HH:mm:ss")+"##"+e.Id,selected?.Id==e.Id,ImGuiSelectableFlags.SpanAllColumns))selected=e;
-                ImGui.TableNextColumn();ImGui.TextUnformatted(e.Category.Label());ImGui.TableNextColumn();ImGui.TextWrapped(e.PlaceLabel);
+                ImGui.TableNextColumn();ImGui.TextUnformatted(e.CategoryLabel);ImGui.TableNextColumn();ImGui.TextWrapped(e.PlaceLabel);
                 ImGui.TableNextColumn();ImGui.TextColored(e.IsGap?Muted:e.Amount>0?Green:Red,e.Amount.ToString("+#,0;-#,0;0"));ImGui.TableNextColumn();ImGui.TextUnformatted(Money(e.After));
             }ImGui.EndTable();
         }
         ImGui.BeginDisabled(page==0);if(ImGui.Button("上一页"))page--;ImGui.EndDisabled();ImGui.SameLine();ImGui.TextUnformatted($"{page+1} / {pages}");ImGui.SameLine();ImGui.BeginDisabled(page+1>=pages);if(ImGui.Button("下一页"))page++;ImGui.EndDisabled();
         if(selected is {} s&&plugin.Current?.CharacterId==s.CharacterId) {
-            ImGui.Separator();ImGui.TextColored(Gold,"交易详情 · "+s.Category.Label());ImGui.SameLine();if(ImGui.SmallButton("收起"))selected=null;
+            ImGui.Separator();ImGui.TextColored(Gold,"交易详情 · "+s.CategoryLabel);ImGui.SameLine();if(ImGui.SmallButton("收起"))selected=null;
             ImGui.TextWrapped($"{s.Time.LocalDateTime:yyyy-MM-dd HH:mm:ss} · {s.PlaceLabel}");
             ImGui.TextWrapped($"{(s.Category==Category.Teleport?"起点":"地点")}世界坐标 X {s.Location.X:F1} / Z {s.Location.Y:F1}");
             ImGui.TextUnformatted($"余额 {Money(s.Before)} → {Money(s.After)}");ImGui.TextWrapped("识别依据："+s.Source);

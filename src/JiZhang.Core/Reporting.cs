@@ -2,7 +2,7 @@ namespace JiZhang.Core;
 
 public enum ReportPeriod { Month, Year, All }
 public sealed record ReportBucket(DateTime Start, Totals Total);
-public sealed record LedgerReport(ReportBucket[] Buckets, (Category Category,long Amount)[] Spending, Totals Total)
+public sealed record LedgerReport(ReportBucket[] Buckets, (Category Category, string Label, long Amount)[] Spending, Totals Total)
 {
     public static LedgerReport Create(IEnumerable<LedgerEntry> entries, DateTime today, ReportPeriod period, bool excludeTransfers) {
         var all=entries.Where(e=>!e.IsGap&&(!excludeTransfers||!e.Category.IsTransfer())&&e.Time.LocalDateTime.Date<=today.Date).ToArray();
@@ -17,7 +17,11 @@ public sealed record LedgerReport(ReportBucket[] Buckets, (Category Category,lon
             buckets.Add(new(cursor,Totals.From(selected.Where(e=>e.Time.LocalDateTime>=cursor&&e.Time.LocalDateTime<end),false)));
             cursor=end;
         }
-        return new(buckets.ToArray(),selected.Where(e=>e.Amount<0).GroupBy(e=>e.Category).Select(g=>(g.Key,-g.Sum(e=>e.Amount))).OrderByDescending(g=>g.Item2).ToArray(),Totals.From(selected,false));
+        var spending = selected.Where(e => e.Amount < 0).GroupBy(e => (e.Category, e.CategoryLabel))
+            .Select(g => (g.Key.Category, g.Key.CategoryLabel, Amount: -g.Sum(e => e.Amount)))
+            .OrderByDescending(g => g.Amount).ThenBy(g => g.Category).ThenBy(g => g.CategoryLabel, StringComparer.Ordinal)
+            .ToArray();
+        return new(buckets.ToArray(), spending, Totals.From(selected, false));
     }
 }
 

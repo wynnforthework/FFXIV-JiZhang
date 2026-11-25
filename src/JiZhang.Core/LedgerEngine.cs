@@ -57,15 +57,27 @@ public sealed class LedgerEngine
             foreach (var entry in group) {
                 var candidates = evidence.Where(e => e.CharacterId == entry.CharacterId && e.Amount == entry.Amount &&
                     (e.Time - entry.Time).Duration() <= CorrelationWindow).ToList();
-                // Ambiguous or overlapping matches stay unknown; no fabricated split or item attribution.
-                var unique = candidates.GroupBy(e => (e.Category, e.ItemId, e.Quantity)).ToList();
+                var preferred = candidates.Where(e => !e.IsContextHint && e.ExpenseMessageId == null).ToList();
+                if (preferred.Count == 0) preferred = candidates.Where(e => !e.IsContextHint).ToList();
+                if (preferred.Count == 0) preferred = candidates;
+                if (preferred.Any(e => e.Category is Category.QuestReward or Category.DutyReward or Category.ChallengeReward))
+                    preferred = preferred.Where(e => e.Category != Category.SystemReward).ToList();
+                // A confirmation without item details can agree with a more detailed event.
+                var categoryConflict = preferred.Select(e => e.Category).Distinct().Skip(1).Any();
+                var itemConflict = preferred.Where(e => e.ItemId != null).Select(e => e.ItemId).Distinct().Skip(1).Any();
+                var quantityConflict = preferred.Where(e => e.Quantity != null).Select(e => e.Quantity).Distinct().Skip(1).Any();
+                var expenseCodeConflict = preferred.Select(e => e.ExpenseMessageId).Distinct().Skip(1).Any();
                 // Missing destination is compatible with a more detailed confirmation; two distinct destinations conflict.
-                var destinationConflict=candidates.Where(e=>e.Destination!=null).Select(e=>e.Destination).Distinct().Skip(1).Any();
+                var destinationConflict=preferred.Where(e=>e.Destination!=null).Select(e=>e.Destination).Distinct().Skip(1).Any();
                 var competing = pending.Count(p => p.CharacterId == entry.CharacterId && p.Amount == entry.Amount && !p.IsGap &&
-                    candidates.Any(e => (p.Time - e.Time).Duration() <= CorrelationWindow));
-                var match = !entry.IsGap && unique.Count == 1 && !destinationConflict && competing == 1 ? candidates.OrderByDescending(e=>e.Destination!=null).First() : null;
+                    preferred.Any(e => (p.Time - e.Time).Duration() <= CorrelationWindow));
+                var match = !entry.IsGap && !categoryConflict && !itemConflict && !quantityConflict &&
+                    !destinationConflict && !expenseCodeConflict && competing == 1
+                    ? preferred.OrderByDescending(e => e.Destination != null).ThenByDescending(e => e.ItemId != null).First()
+                    : null;
                 entries.Add(match == null ? entry : entry with { Category = match.Category, Detail = match.Detail,
-                    Source = match.Source, ItemId = match.ItemId, ItemName = match.ItemName, Quantity = match.Quantity, Destination = match.Destination });
+                    Source = match.Source, ItemId = match.ItemId, ItemName = match.ItemName, Quantity = match.Quantity,
+                    Destination = match.Destination, ExpenseMessageId = match.ExpenseMessageId });
                 foreach (var e in candidates) evidence.Remove(e);
             }
             // Persist only through the last emitted entry, never past an unflushed transaction.

@@ -135,12 +135,12 @@ public sealed partial class LedgerStore : IDisposable
         using var reader = cmd.ExecuteReader();
         var exportPath = Path.Combine(DirectoryPath, $"ledger-{cid}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv");
         using var file = new StreamWriter(exportPath, false, new UTF8Encoding(true));
-        file.WriteLine("角色,UTC时间,本地时间,地点,X,Z,收支,金额,变化前余额,变化后余额,分类,说明,识别依据,物品,数量,目的地");
+        file.WriteLine("角色,UTC时间,本地时间,地点,X,Z,收支,金额,变化前余额,变化后余额,分类,说明,识别依据,物品,数量,目的地,待审核标识");
         while (reader.Read()) {
             var e = JsonSerializer.Deserialize<LedgerEntry>(reader.GetString(0))!;
             file.WriteLine(string.Join(",", new[] { e.CharacterName, e.Time.ToUniversalTime().ToString("O"), e.Time.ToLocalTime().ToString("O"), e.Location.Name,
                 e.Location.X?.ToString(CultureInfo.InvariantCulture), e.Location.Y?.ToString(CultureInfo.InvariantCulture), e.Amount > 0 ? "收入" : "支出", Math.Abs(e.Amount).ToString(CultureInfo.InvariantCulture),
-                e.Before.ToString(CultureInfo.InvariantCulture), e.After.ToString(CultureInfo.InvariantCulture), e.Category.Label(), e.Detail, e.Source, e.ItemName, e.Quantity?.ToString(CultureInfo.InvariantCulture), e.Destination }.Select(Csv)));
+                e.Before.ToString(CultureInfo.InvariantCulture), e.After.ToString(CultureInfo.InvariantCulture), e.Category.Label(), e.Detail, e.Source, e.ItemName, e.Quantity?.ToString(CultureInfo.InvariantCulture), e.Destination, e.ExpenseCode }.Select(Csv)));
         }
         return exportPath;
     });
