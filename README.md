@@ -33,7 +33,7 @@
 
 ## 安装与使用
 
-当前为 **0.1.1 公开预览版**。在卫月插件安装器的设置中添加下面的自定义插件仓库地址，保存后搜索“小肥记账”安装。也可从 [Releases](https://github.com/wynnforthework/FFXIV-JiZhang/releases) 下载 ZIP，按 [本地开发说明](docs/DEVELOPMENT.md) 加载开发插件。
+在卫月插件安装器的设置中添加下面的自定义插件仓库地址，保存后搜索“小肥记账”安装。也可从 [Releases](https://github.com/wynnforthework/FFXIV-JiZhang/releases) 下载最新公开预览版 ZIP，按 [本地开发说明](docs/DEVELOPMENT.md) 加载开发插件。
 
 加载后输入 `/jizhang`。首次启用只建立余额基线，后续实际金币变化会自动记录；停用或离线期间的余额差额单独保存，不计入正常收支。
 
