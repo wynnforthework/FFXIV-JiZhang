@@ -83,17 +83,53 @@ public sealed partial class LedgerStore : IDisposable
         using var target = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = backupPath, Pooling = false }.ToString()); target.Open(); db.BackupDatabase(target); return backupPath;
     }
     // Caller suspends capture, drains writes, then re-baselines after restore.
-    public Task RestoreAsync(string backupPath) => Run(db => {
+    public Task<BalanceSample[]> RestoreAsync(string backupPath) => Run(db => {
         var fullPath = Path.GetFullPath(backupPath);
         if (string.Equals(fullPath, path, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("不能将当前账本作为恢复源。");
         using var source = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = fullPath, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString()); source.Open();
+        // Keep the read snapshot pinned from validation through the copy.
+        using var snapshot = source.BeginTransaction(deferred: true);
+        var states = new List<BalanceSample>();
         using (var check = source.CreateCommand()) {
+            check.Transaction = snapshot;
             check.CommandText = "PRAGMA integrity_check"; if ((string?)check.ExecuteScalar() != "ok") throw new InvalidDataException("备份完整性检查失败。");
             check.CommandText = "PRAGMA user_version"; if (Convert.ToInt32(check.ExecuteScalar()) != SchemaVersion) throw new InvalidDataException("备份版本不兼容。");
-            check.CommandText = "SELECT json FROM states UNION ALL SELECT json FROM entries LIMIT 0"; check.ExecuteNonQuery();
+            check.CommandText = "SELECT character_id, json FROM states";
+            using (var rows = check.ExecuteReader()) {
+                while (rows.Read()) {
+                    var state = ReadBackupRecord<BalanceSample>(rows, 1, "余额检查点");
+                    if (!MatchesCharacter(rows.GetString(0), state.CharacterId) || state.Location?.Name == null ||
+                        state.CharacterName == null || state.Time == default || !ValidBalance(state.Balance))
+                        throw new InvalidDataException("备份中的余额检查点不完整或不一致。");
+                    states.Add(state);
+                }
+            }
+            check.CommandText = "SELECT id, character_id, time, json FROM entries";
+            using (var rows = check.ExecuteReader()) {
+                while (rows.Read()) {
+                    var entry = ReadBackupRecord<LedgerEntry>(rows, 3, "流水");
+                    if (string.IsNullOrEmpty(entry.Id) || rows.GetString(0) != entry.Id ||
+                        !MatchesCharacter(rows.GetString(1), entry.CharacterId) || entry.Time == default ||
+                        !DateTimeOffset.TryParse(rows.GetString(2), CultureInfo.InvariantCulture, out var indexedTime) || indexedTime != entry.Time ||
+                        entry.Location?.Name == null || entry.CharacterName == null || entry.Source == null || entry.Detail == null ||
+                        !ValidBalance(entry.Before) || !ValidBalance(entry.After))
+                        throw new InvalidDataException("备份中的流水记录不完整或不一致。");
+                }
+            }
         }
-        Backup(db, "before-restore"); source.BackupDatabase(db); cache.Clear(); LastError = null; return true;
+        Backup(db, "before-restore"); source.BackupDatabase(db); cache.Clear(); LastError = null; return states.ToArray();
     });
+    private static T ReadBackupRecord<T>(SqliteDataReader rows, int column, string kind) where T : class {
+        if (rows.IsDBNull(column)) throw new InvalidDataException($"备份中的{kind}为空。");
+        try {
+            return JsonSerializer.Deserialize<T>(rows.GetString(column)) ??
+                throw new InvalidDataException($"备份中的{kind}为空。");
+        } catch (JsonException e) {
+            throw new InvalidDataException($"备份中的{kind}无法解析。", e);
+        }
+    }
+    private static bool MatchesCharacter(string key, ulong id) => id != 0 && key == id.ToString(CultureInfo.InvariantCulture);
+    private static bool ValidBalance(long balance) => balance is >= 0 and <= 999999999;
     public Task<string> ExportAsync(ulong cid) => Run(db => {
         using var cmd = db.CreateCommand(); cmd.CommandText = "SELECT json FROM entries WHERE character_id=$cid ORDER BY time,rowid"; cmd.Parameters.AddWithValue("$cid", cid.ToString(CultureInfo.InvariantCulture));
         using var reader = cmd.ExecuteReader();

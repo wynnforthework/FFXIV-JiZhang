@@ -92,5 +92,36 @@ public sealed class LedgerTests
             Assert.Equal(1000,Assert.Single(await store.LoadStatesAsync()).Balance);Assert.Empty(await store.LoadEntriesAsync(1));Assert.NotNull(store.LastError);
         } finally {Directory.Delete(path,true);}
     }
-
+    [Theory]
+    [InlineData("states", "{")]
+    [InlineData("entries", "{")]
+    [InlineData("states", "null")]
+    [InlineData("entries", "{}")]
+    public async Task RestoreRejectsStructurallyValidBackupWithInvalidRecords(string table, string json) {
+        var root = Path.Combine(Path.GetTempPath(), "JiZhang-tests-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(root, "ledger.sqlite");
+        try {
+            var state = S(900);
+            var entry = new LedgerEntry("live", 1, state.CharacterName, T, 1000, 900, state.Location);
+            using (var store = new LedgerStore(path)) {
+                await store.SaveAsync(new(state, [entry]));
+                var backup = await store.BackupAsync();
+                using (var db = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={backup};Pooling=False")) {
+                    db.Open();
+                    using var command = db.CreateCommand();
+                    command.CommandText = $"UPDATE {table} SET json=$json";
+                    command.Parameters.AddWithValue("$json", json);
+                    Assert.Equal(1, command.ExecuteNonQuery());
+                }
+                Assert.Equal(entry, Assert.Single(await store.LoadEntriesAsync(1)));
+                await Assert.ThrowsAsync<InvalidDataException>(() => store.RestoreAsync(backup));
+                Assert.Equal(state, Assert.Single(await store.LoadStatesAsync()));
+                Assert.Equal(entry, Assert.Single(await store.LoadEntriesAsync(1)));
+                Assert.Empty(Directory.GetFiles(root, "before-restore-*.sqlite"));
+            }
+            using var reopened = new LedgerStore(path);
+            Assert.Equal(state, Assert.Single(await reopened.LoadStatesAsync()));
+            Assert.Equal(entry, Assert.Single(await reopened.LoadEntriesAsync(1)));
+        } finally { Directory.Delete(root, true); }
+    }
 }

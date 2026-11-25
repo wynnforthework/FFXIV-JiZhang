@@ -44,8 +44,8 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
     private bool dirty;
     private bool disposed;
     private bool restoring;
-    private Task? restoreTask;
-    private Task<BalanceSample[]>? restoreStates;
+    private Task<BalanceSample[]>? restoreTask;
+    private string? restoreStatus;
     private ulong activeCharacter;
     private readonly object marketLock = new();
     private MarketRequest? request;
@@ -79,8 +79,11 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
         try {
             foreach (var task in saves.Where(t => t.IsCompleted).ToArray()) { task.GetAwaiter().GetResult(); saves.Remove(task); }
             if (restoring) {
-                if (restoreTask is { IsCompleted: true } && restoreStates == null) { restoreTask.GetAwaiter().GetResult(); restoreStates = Store.LoadStatesAsync(); }
-                if (restoreStates is { IsCompleted: true }) { engine = new(restoreStates.GetAwaiter().GetResult()); restoring = false; restoreTask = null; restoreStates = null; Entries = []; dirty = true; Status = "备份已恢复，正在重新核对余额"; }
+                if (restoreTask is { IsCompleted: true }) {
+                    engine = new(restoreTask.GetAwaiter().GetResult());
+                    restoring = false; restoreTask = null; Entries = []; read = null; dirty = true;
+                    restoreStatus = "备份已恢复。";
+                }
                 return;
             }
             if (engine == null) { if (!initial.IsCompleted) return; engine = new(initial.GetAwaiter().GetResult()); }
@@ -128,7 +131,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
             }
             Status = Config.EnableExperimentalClassification ? "正在自动记录 · 用途识别为实验功能" : "正在自动记录 · 事件金额匹配分类";
         } catch (Exception e) {
-            if (restoring) { restoring = false; restoreTask = null; restoreStates = null; Status = "恢复失败，原账本保留：" + e.Message; }
+            if (restoring) { restoring = false; restoreTask = null; restoreStatus = "恢复失败，原账本保留：" + e.Message; }
             else { fatalError = e.Message; Status = "记录已暂停，请重新加载插件：" + e.Message; }
             Log.Error(e, "小肥记账记录失败");
         }
@@ -180,6 +183,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
         restoring = true; activeCharacter = 0; Current = null; teleport.Reset(); systemMessages.Reset();
         while (incoming.TryDequeue(out _)) { }
         lock (marketLock) request = null;
+        restoreStatus = "正在恢复备份…";
         restoreTask = Store.RestoreAsync(path);
     }
     public IDisposable PushFont(float tier) => fonts.Push(tier);
@@ -189,6 +193,7 @@ public sealed partial class Plugin : IDalamudPlugin, ILedgerUiContext
     LedgerEntry[] ILedgerUiContext.Entries => Entries;
     BalanceSample? ILedgerUiContext.Current => Current;
     string ILedgerUiContext.Status => Status;
+    string? ILedgerUiContext.RestoreStatus => restoreStatus;
     string ILedgerUiContext.DataDirectory => Store.DirectoryPath;
     void ILedgerUiContext.SaveConfig() => SaveConfig();
     Task<string> ILedgerUiContext.ExportAsync() => Current is { } current ? Store.ExportAsync(current.CharacterId) : Task.FromException<string>(new InvalidOperationException("请先登录角色"));

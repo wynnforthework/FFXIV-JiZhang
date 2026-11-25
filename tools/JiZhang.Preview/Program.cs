@@ -107,6 +107,7 @@ namespace JiZhang {
         public Configuration Config{get;}=new();public LedgerEntry[] Entries{get;}
         public BalanceSample? Current{get;}=new(1,"示例角色",DateTimeOffset.Now,1518170,new(128,"利姆萨·罗敏萨"));
         public string Status=>"正在自动记录 · 离线示例";public string DataDirectory=>"本地账本目录";
+        public string? RestoreStatus => null;
         public PreviewContext(bool data,string scenario) {
             if(!data){Entries=[];return;}
             var list=new List<LedgerEntry>();long balance=1518170;

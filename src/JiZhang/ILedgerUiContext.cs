@@ -8,6 +8,7 @@ internal interface ILedgerUiContext
     LedgerEntry[] Entries { get; }
     BalanceSample? Current { get; }
     string Status { get; }
+    string? RestoreStatus { get; }
     string DataDirectory { get; }
     IDisposable PushFont(float tier);
     void SaveConfig();
